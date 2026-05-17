@@ -81,7 +81,12 @@ export type TicketDetail = {
 export type OrganizerApplication = {
   id?: string;
   userId?: string;
+  businessName?: string;
+  contactEmail?: string;
+  description?: string;
   status?: string;
+  reviewedBy?: string;
+  reviewedAt?: string;
   createdAt?: string;
   updatedAt?: string;
   [key: string]: unknown;
