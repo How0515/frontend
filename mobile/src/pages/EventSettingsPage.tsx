@@ -21,7 +21,12 @@ export default function EventSettingsPage({ route }: any) {
   const [category, setCategory] = useState('CONCERT');
   const [venue, setVenue] = useState('');
   const [description, setDescription] = useState('');
+  const [imageUrl, setImageUrl] = useState('');
   const [eventAt, setEventAt] = useState('');
+  const [resaleAllowed, setResaleAllowed] = useState(true);
+  const [maxResaleRate, setMaxResaleRate] = useState('120');
+  const [resaleStart, setResaleStart] = useState('');
+  const [resaleEnd, setResaleEnd] = useState('');
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -34,7 +39,12 @@ export default function EventSettingsPage({ route }: any) {
       setCategory(detail.category || 'CONCERT');
       setVenue(detail.venue || '');
       setDescription(detail.description || '');
+      setImageUrl(detail.imageUrl || '');
       setEventAt((detail.eventAt || detail.eventDateTime || '').slice(0, 16));
+      setResaleAllowed(detail.resaleAllowed ?? true);
+      setMaxResaleRate(String((detail.maxResalePriceRate ?? 12000) / 100));
+      setResaleStart((detail.resaleStart || '').slice(0, 16));
+      setResaleEnd((detail.resaleEnd || '').slice(0, 16));
     } catch (error: any) {
       Alert.alert('이벤트 정보 로드 실패', errorMessage(error, '이벤트 정보를 불러오지 못했습니다.'));
     } finally {
@@ -54,6 +64,7 @@ export default function EventSettingsPage({ route }: any) {
         category,
         venue: venue.trim(),
         description: description.trim() || null,
+        imageUrl: imageUrl.trim() || null,
         eventAt: eventAt ? new Date(eventAt).toISOString() : null,
       });
       setFeedback('이벤트 정보가 저장되었습니다.');
@@ -61,6 +72,37 @@ export default function EventSettingsPage({ route }: any) {
       await load();
     } catch (error: any) {
       const message = errorMessage(error, '이벤트 정보를 수정하지 못했습니다.');
+      setFeedback(message);
+      Alert.alert('저장 실패', message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const saveResalePolicy = async () => {
+    if (!event) return;
+    const rate = Number(maxResaleRate);
+    if (Number.isNaN(rate) || rate < 100) {
+      const message = '최대 리셀 가격 비율은 100 이상이어야 합니다.';
+      setFeedback(message);
+      Alert.alert('입력 오류', message);
+      return;
+    }
+
+    setSaving(true);
+    setFeedback(null);
+    try {
+      await backendApi.updateResalePolicy(event.id, {
+        resaleAllowed,
+        maxResalePriceRate: Math.round(rate * 100),
+        resaleStart: resaleAllowed && resaleStart ? new Date(resaleStart).toISOString() : null,
+        resaleEnd: resaleAllowed && resaleEnd ? new Date(resaleEnd).toISOString() : null,
+      });
+      setFeedback('리셀 정책이 저장되었습니다.');
+      Alert.alert('저장 완료', '리셀 정책이 저장되었습니다.');
+      await load();
+    } catch (error: any) {
+      const message = errorMessage(error, '리셀 정책을 수정하지 못했습니다.');
       setFeedback(message);
       Alert.alert('저장 실패', message);
     } finally {
@@ -92,12 +134,31 @@ export default function EventSettingsPage({ route }: any) {
         <TextInput style={styles.input} value={venue} onChangeText={setVenue} />
         <Text style={styles.label}>일시</Text>
         <TextInput style={styles.input} value={eventAt} onChangeText={setEventAt} placeholder="YYYY-MM-DDTHH:mm" />
+        <Text style={styles.label}>이미지 URL</Text>
+        <TextInput style={styles.input} value={imageUrl} onChangeText={setImageUrl} placeholder="https://..." autoCapitalize="none" />
         <Text style={styles.label}>설명</Text>
         <TextInput style={[styles.input, styles.textArea]} value={description} onChangeText={setDescription} multiline />
       </View>
       <TouchableOpacity style={[styles.primaryButton, saving && styles.disabledButton]} disabled={saving} onPress={save}>
         <Text style={styles.primaryButtonText}>{saving ? '저장 중...' : '저장'}</Text>
       </TouchableOpacity>
+
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>리셀 정책</Text>
+        <TouchableOpacity style={styles.toggleRow} onPress={() => setResaleAllowed((value) => !value)}>
+          <Text style={styles.toggleLabel}>리셀 허용</Text>
+          <Text style={[styles.toggleBadge, resaleAllowed ? styles.toggleOn : styles.toggleOff]}>{resaleAllowed ? 'ON' : 'OFF'}</Text>
+        </TouchableOpacity>
+        <Text style={styles.label}>최대 리셀 가격 비율 (%)</Text>
+        <TextInput style={styles.input} value={maxResaleRate} onChangeText={setMaxResaleRate} keyboardType="number-pad" inputMode="numeric" />
+        <Text style={styles.label}>리셀 시작</Text>
+        <TextInput style={styles.input} value={resaleStart} onChangeText={setResaleStart} placeholder="YYYY-MM-DDTHH:mm" />
+        <Text style={styles.label}>리셀 종료</Text>
+        <TextInput style={styles.input} value={resaleEnd} onChangeText={setResaleEnd} placeholder="YYYY-MM-DDTHH:mm" />
+        <TouchableOpacity style={[styles.secondaryButton, saving && styles.disabledButton]} disabled={saving} onPress={saveResalePolicy}>
+          <Text style={styles.secondaryButtonText}>리셀 정책 저장</Text>
+        </TouchableOpacity>
+      </View>
     </ScrollView>
   );
 }
@@ -111,6 +172,7 @@ const styles = StyleSheet.create({
   messageBox: { marginTop: 14, borderRadius: 12, padding: 12, borderWidth: 1, backgroundColor: '#EFF6FF', borderColor: '#BFDBFE' },
   messageText: { color: '#1D4ED8', fontWeight: '800' },
   card: { marginTop: 16, backgroundColor: '#FFFFFF', borderRadius: 18, padding: 16, borderWidth: 1, borderColor: '#E2E8F0' },
+  cardTitle: { color: '#0F172A', fontSize: 17, fontWeight: '900' },
   label: { marginTop: 12, marginBottom: 6, color: '#334155', fontSize: 13, fontWeight: '800' },
   input: { borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 12, padding: 12, backgroundColor: '#FFFFFF', color: '#0F172A' },
   textArea: { minHeight: 100, textAlignVertical: 'top' },
@@ -121,5 +183,12 @@ const styles = StyleSheet.create({
   activeCategoryChipText: { color: '#2563EB' },
   primaryButton: { backgroundColor: '#2563EB', borderRadius: 14, paddingVertical: 15, alignItems: 'center', marginTop: 16 },
   primaryButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '900' },
+  secondaryButton: { borderWidth: 1, borderColor: '#CBD5E1', backgroundColor: '#FFFFFF', borderRadius: 14, paddingVertical: 14, alignItems: 'center', marginTop: 14 },
+  secondaryButtonText: { color: '#0F172A', fontSize: 16, fontWeight: '900' },
+  toggleRow: { marginTop: 14, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 12, padding: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  toggleLabel: { color: '#0F172A', fontWeight: '800' },
+  toggleBadge: { overflow: 'hidden', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4, fontWeight: '900' },
+  toggleOn: { backgroundColor: '#DCFCE7', color: '#166534' },
+  toggleOff: { backgroundColor: '#F1F5F9', color: '#64748B' },
   disabledButton: { opacity: 0.55 },
 });

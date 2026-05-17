@@ -1,18 +1,56 @@
-import React, { useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
+import { Alert, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { errorMessage } from '../lib/account';
 import { backendApi } from '../lib/backend';
+
+type QrPayload = {
+  ticketId?: string;
+  claimedOwner?: string;
+  expiresAt?: string | number;
+  signature?: string;
+};
+
+function normalizeExpiresAt(value?: string | number) {
+  if (value === undefined || value === null || value === '') return '';
+  if (typeof value === 'number' || /^\d+$/.test(String(value))) {
+    return new Date(Number(value) * 1000).toISOString();
+  }
+  return String(value);
+}
 
 export default function CheckInManagePage({ route }: any) {
   const eventId = route?.params?.eventId as string;
   const [validatorId, setValidatorId] = useState('');
+  const [validators, setValidators] = useState<Record<string, unknown>[]>([]);
+  const [ticketId, setTicketId] = useState('');
+  const [claimedOwner, setClaimedOwner] = useState('');
+  const [expiresAt, setExpiresAt] = useState('');
+  const [signature, setSignature] = useState('');
+  const [memo, setMemo] = useState('');
+  const [qrPayload, setQrPayload] = useState('');
   const [saving, setSaving] = useState(false);
-  const [feedback, setFeedback] = useState<string | null>(null);
+  const [checkingIn, setCheckingIn] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [feedback, setFeedback] = useState<{ type: 'error' | 'success' | 'info'; message: string } | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      const data = await backendApi.getEventValidators(eventId).catch(() => []);
+      setValidators(data);
+    } catch (error: any) {
+      setFeedback({ type: 'error', message: errorMessage(error, '검증자 목록을 불러오지 못했습니다.') });
+    } finally {
+      setRefreshing(false);
+    }
+  }, [eventId]);
+
+  useFocusEffect(useCallback(() => { void load(); }, [load]));
 
   const addValidator = async () => {
     if (!validatorId.trim()) {
       const message = '검증자로 등록할 사용자 UUID를 입력해 주세요.';
-      setFeedback(message);
+      setFeedback({ type: 'error', message });
       Alert.alert('입력 필요', message);
       return;
     }
@@ -22,33 +60,118 @@ export default function CheckInManagePage({ route }: any) {
     try {
       await backendApi.addEventValidator(eventId, { userId: validatorId.trim() });
       setValidatorId('');
-      setFeedback('체크인 검증자를 등록했습니다.');
-      Alert.alert('등록 완료', '체크인 검증자를 등록했습니다.');
+      setFeedback({ type: 'success', message: '체크인 검증자를 등록했습니다.' });
+      await load();
     } catch (error: any) {
       const message = errorMessage(error, '검증자를 등록하지 못했습니다.');
-      setFeedback(message);
+      setFeedback({ type: 'error', message });
       Alert.alert('검증자 등록 실패', message);
     } finally {
       setSaving(false);
     }
   };
 
+  const applyPayload = () => {
+    try {
+      const parsed = JSON.parse(qrPayload.trim()) as QrPayload;
+      setTicketId(parsed.ticketId || '');
+      setClaimedOwner(parsed.claimedOwner || '');
+      setExpiresAt(normalizeExpiresAt(parsed.expiresAt));
+      setSignature(parsed.signature || '');
+      setFeedback({ type: 'success', message: 'QR payload를 입력 폼에 반영했습니다.' });
+    } catch {
+      const message = 'QR payload는 JSON 형식이어야 합니다.';
+      setFeedback({ type: 'error', message });
+      Alert.alert('QR 입력 오류', message);
+    }
+  };
+
+  const checkIn = async () => {
+    if (!ticketId.trim() || !claimedOwner.trim() || !expiresAt.trim() || !signature.trim()) {
+      const message = 'ticketId, 소유자 지갑, 만료 시간, 서명이 모두 필요합니다.';
+      setFeedback({ type: 'error', message });
+      Alert.alert('입력 필요', message);
+      return;
+    }
+
+    setCheckingIn(true);
+    setFeedback(null);
+    try {
+      await backendApi.checkIn({
+        ticketId: ticketId.trim(),
+        claimedOwner: claimedOwner.trim(),
+        expiresAt: expiresAt.trim(),
+        signature: signature.trim(),
+        memo: memo.trim() || null,
+      });
+      setFeedback({ type: 'success', message: '입장 처리가 완료되었습니다.' });
+      setMemo('');
+    } catch (error: any) {
+      const message = errorMessage(error, '입장 처리에 실패했습니다.');
+      setFeedback({ type: 'error', message });
+      Alert.alert('입장 처리 실패', message);
+    } finally {
+      setCheckingIn(false);
+    }
+  };
+
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); void load(); }} />}
+    >
       <Text style={styles.eyebrow}>Check-in Manage</Text>
       <Text style={styles.title}>체크인 관리</Text>
-      <Text style={styles.subtitle}>현장 검증자를 등록하고 QR/바코드 스캔 운영을 준비합니다.</Text>
-      {feedback ? <View style={styles.messageBox}><Text style={styles.messageText}>{feedback}</Text></View> : null}
+      <Text style={styles.subtitle}>QR payload를 붙여넣거나 수동 입력해서 입장 처리를 진행합니다.</Text>
+
+      {feedback ? (
+        <View style={[styles.messageBox, feedback.type === 'error' ? styles.errorBox : styles.infoBox]}>
+          <Text style={[styles.messageText, feedback.type === 'error' ? styles.errorText : styles.infoText]}>{feedback.message}</Text>
+        </View>
+      ) : null}
+
       <View style={styles.card}>
-        <Text style={styles.label}>검증자 사용자 UUID</Text>
-        <TextInput style={styles.input} value={validatorId} onChangeText={setValidatorId} placeholder="사용자 UUID" autoCapitalize="none" />
-        <TouchableOpacity style={[styles.primaryButton, saving && styles.disabledButton]} disabled={saving} onPress={addValidator}>
-          <Text style={styles.primaryButtonText}>{saving ? '등록 중...' : '검증자 등록'}</Text>
+        <Text style={styles.cardTitle}>QR/바코드 입력</Text>
+        <Text style={styles.cardText}>현재 앱에는 카메라 스캔 패키지가 없어 QR 내용을 붙여넣는 방식으로 처리합니다.</Text>
+        <TextInput style={[styles.input, styles.textArea]} value={qrPayload} onChangeText={setQrPayload} placeholder='{"ticketId":"...","claimedOwner":"0x...","expiresAt":"...","signature":"..."}' multiline />
+        <TouchableOpacity style={styles.secondaryButton} onPress={applyPayload}>
+          <Text style={styles.secondaryButtonText}>QR 내용 반영</Text>
         </TouchableOpacity>
       </View>
+
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>QR/바코드 스캔</Text>
-        <Text style={styles.cardText}>카메라 기반 스캔 UI는 다음 단계에서 Expo 카메라 권한과 함께 연결하면 됩니다. 현재 백엔드는 `/check-ins` 입장 처리 API를 제공합니다.</Text>
+        <Text style={styles.cardTitle}>입장 처리</Text>
+        <Text style={styles.label}>티켓 ID</Text>
+        <TextInput style={styles.input} value={ticketId} onChangeText={setTicketId} autoCapitalize="none" />
+        <Text style={styles.label}>소유자 지갑 주소</Text>
+        <TextInput style={styles.input} value={claimedOwner} onChangeText={setClaimedOwner} autoCapitalize="none" />
+        <Text style={styles.label}>만료 시간</Text>
+        <TextInput style={styles.input} value={expiresAt} onChangeText={setExpiresAt} placeholder="ISO 시간 또는 QR epoch" autoCapitalize="none" />
+        <Text style={styles.label}>서명</Text>
+        <TextInput style={[styles.input, styles.textAreaSmall]} value={signature} onChangeText={setSignature} autoCapitalize="none" multiline />
+        <Text style={styles.label}>메모</Text>
+        <TextInput style={styles.input} value={memo} onChangeText={setMemo} placeholder="선택 입력" />
+        <TouchableOpacity style={[styles.primaryButton, checkingIn && styles.disabledButton]} disabled={checkingIn} onPress={checkIn}>
+          <Text style={styles.primaryButtonText}>{checkingIn ? '처리 중...' : '입장 처리'}</Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>검증자 관리</Text>
+        <TextInput style={styles.input} value={validatorId} onChangeText={setValidatorId} placeholder="검증자 사용자 UUID" autoCapitalize="none" />
+        <TouchableOpacity style={[styles.secondaryButton, saving && styles.disabledButton]} disabled={saving} onPress={addValidator}>
+          <Text style={styles.secondaryButtonText}>{saving ? '등록 중...' : '검증자 등록'}</Text>
+        </TouchableOpacity>
+        {validators.length === 0 ? (
+          <Text style={styles.emptyText}>등록된 검증자가 없습니다.</Text>
+        ) : (
+          validators.map((validator, index) => (
+            <Text key={String(validator.id ?? index)} style={styles.validatorText}>
+              {String(validator.displayName ?? validator.validatorId ?? validator.userId ?? validator.id ?? '-')}
+            </Text>
+          ))
+        )}
       </View>
     </ScrollView>
   );
@@ -60,14 +183,24 @@ const styles = StyleSheet.create({
   eyebrow: { color: '#2563EB', fontWeight: '800', fontSize: 12, letterSpacing: 0.5 },
   title: { marginTop: 4, fontSize: 28, fontWeight: '900', color: '#0F172A' },
   subtitle: { marginTop: 8, color: '#64748B', fontSize: 14, lineHeight: 21 },
-  messageBox: { marginTop: 14, borderRadius: 12, padding: 12, borderWidth: 1, backgroundColor: '#EFF6FF', borderColor: '#BFDBFE' },
-  messageText: { color: '#1D4ED8', fontWeight: '800' },
+  messageBox: { marginTop: 14, borderRadius: 12, padding: 12, borderWidth: 1 },
+  infoBox: { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE' },
+  errorBox: { backgroundColor: '#FEF2F2', borderColor: '#FECACA' },
+  messageText: { fontWeight: '800', lineHeight: 19 },
+  infoText: { color: '#1D4ED8' },
+  errorText: { color: '#DC2626' },
   card: { marginTop: 16, backgroundColor: '#FFFFFF', borderRadius: 18, padding: 16, borderWidth: 1, borderColor: '#E2E8F0' },
   cardTitle: { color: '#0F172A', fontSize: 17, fontWeight: '900' },
   cardText: { marginTop: 8, color: '#64748B', lineHeight: 20 },
-  label: { marginBottom: 6, color: '#334155', fontSize: 13, fontWeight: '800' },
+  label: { marginTop: 12, marginBottom: 6, color: '#334155', fontSize: 13, fontWeight: '800' },
   input: { borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 12, padding: 12, backgroundColor: '#FFFFFF', color: '#0F172A' },
+  textArea: { minHeight: 120, textAlignVertical: 'top' },
+  textAreaSmall: { minHeight: 74, textAlignVertical: 'top' },
   primaryButton: { backgroundColor: '#2563EB', borderRadius: 14, paddingVertical: 15, alignItems: 'center', marginTop: 16 },
   primaryButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '900' },
+  secondaryButton: { borderWidth: 1, borderColor: '#CBD5E1', backgroundColor: '#FFFFFF', borderRadius: 14, paddingVertical: 14, alignItems: 'center', marginTop: 12 },
+  secondaryButtonText: { color: '#0F172A', fontSize: 16, fontWeight: '900' },
   disabledButton: { opacity: 0.55 },
+  emptyText: { color: '#94A3B8', paddingTop: 14, textAlign: 'center' },
+  validatorText: { marginTop: 10, color: '#475569', fontWeight: '800' },
 });
