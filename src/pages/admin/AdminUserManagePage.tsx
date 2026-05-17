@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { backendApi } from "../../lib/backend";
 import type { UserAdminRecord } from "../../types/api";
 
@@ -35,12 +36,34 @@ function formatDate(value?: string) {
   });
 }
 
+function getHttpStatus(cause: unknown) {
+  if (!cause || typeof cause !== "object") {
+    return undefined;
+  }
+
+  const response = (cause as { response?: { status?: number } }).response;
+  return response?.status;
+}
+
 function normalizeStatus(status?: string) {
   return (status ?? "ACTIVE").toUpperCase();
 }
 
+function buildLoadError(cause: unknown) {
+  if (getHttpStatus(cause) === 403) {
+    return "관리자 권한이 없는 계정입니다. 사용자 목록은 ADMIN 역할이 포함된 토큰으로만 조회할 수 있습니다.";
+  }
+
+  if (cause instanceof Error) {
+    return cause.message;
+  }
+
+  return "사용자 목록을 불러오지 못했습니다.";
+}
+
 export function AdminUserManagePage() {
   const [items, setItems] = useState<UserAdminRecord[]>([]);
+  const [hasLoaded, setHasLoaded] = useState(false);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState<UserStatusFilter>("ALL");
@@ -52,12 +75,23 @@ export function AdminUserManagePage() {
     setLoading(true);
     setError(null);
     try {
+      const me = await backendApi.getMe();
+      if (!me.roles?.includes("ADMIN")) {
+        setItems([]);
+        setHasLoaded(false);
+        setError("현재 로그인한 계정에 ADMIN 역할이 없습니다. 관리자 계정으로 다시 로그인하세요.");
+        return;
+      }
+
       const data = await backendApi.getUsers({
         status: filterStatus !== "ALL" ? filterStatus : undefined,
       });
       setItems(data.items ?? []);
+      setHasLoaded(true);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "사용자 목록을 불러오지 못했습니다.");
+      setItems([]);
+      setHasLoaded(false);
+      setError(buildLoadError(cause));
     } finally {
       setLoading(false);
     }
@@ -104,7 +138,7 @@ export function AdminUserManagePage() {
       }
       await load();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "요청 처리 중 오류가 발생했습니다.");
+      setError(buildLoadError(cause));
     } finally {
       setActionUserId(null);
       window.setTimeout(() => setActionMessage(null), 3000);
@@ -122,6 +156,8 @@ export function AdminUserManagePage() {
     { label: "삭제", value: "DELETED" },
   ];
 
+  const showEmptyState = hasLoaded && filteredItems.length === 0 && !loading;
+
   return (
     <>
       <style>{`
@@ -135,13 +171,12 @@ export function AdminUserManagePage() {
         .user-search-input { border-radius: 10px; border: 1px solid var(--border-strong); padding: 0.5rem 0.75rem; font-size: 0.9rem; width: 260px; color: var(--txt-main); background: #fff; }
         .user-search-input::placeholder { color: #8a97a8; }
         .user-search-btn { border: 1px solid var(--border); background: var(--panel); color: var(--txt-main); border-radius: 10px; padding: 0.5rem 0.85rem; cursor: pointer; font-size: 0.9rem; font-weight: 600; }
-        .user-search-btn:hover { background: var(--bg-1); }
         .user-filter-tabs { display: flex; gap: 0.4rem; margin-top: 1rem; flex-wrap: wrap; }
         .user-filter-tab { border: 1px solid var(--border); background: var(--panel-soft); color: var(--txt-sub); border-radius: 999px; padding: 0.38rem 0.9rem; font-size: 0.83rem; font-weight: 600; cursor: pointer; }
-        .user-filter-tab:hover { background: var(--bg-1); color: var(--txt-main); }
         .user-filter-tab.active { background: #e8f1ff; border-color: #cfe0ff; color: var(--accent-2); }
         .user-toast { background: #e8f5e9; border: 1px solid #a5d6a7; color: #2e7d32; border-radius: 10px; padding: 0.6rem 1rem; font-size: 0.88rem; font-weight: 600; margin-top: 0.75rem; }
-        .user-error { background: #fff5f5; border: 1px solid #ffcdd2; color: #c62828; border-radius: 10px; padding: 0.6rem 1rem; font-size: 0.88rem; font-weight: 600; margin-top: 0.75rem; }
+        .user-error { background: #fff5f5; border: 1px solid #ffcdd2; color: #c62828; border-radius: 10px; padding: 0.75rem 1rem; font-size: 0.88rem; font-weight: 600; margin-top: 0.75rem; display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; }
+        .user-error .button { border-color: #ffcdd2; background: #fff; color: #c62828; padding: 0.35rem 0.65rem; }
         .user-table-shell { background: var(--panel); border: 1px solid var(--border); border-radius: 20px; box-shadow: var(--shadow); overflow: hidden; }
         .user-table-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1rem 1.25rem; border-bottom: 1px solid var(--border); background: linear-gradient(180deg, #fff, #f7f9fc); }
         .user-table-head h3 { margin: 0; font-size: 0.95rem; font-weight: 700; }
@@ -152,7 +187,6 @@ export function AdminUserManagePage() {
         .user-table th { padding: 0.7rem 1rem; text-align: left; font-size: 0.78rem; font-weight: 700; color: var(--txt-sub); white-space: nowrap; }
         .user-table td { padding: 0.85rem 1rem; border-bottom: 1px solid var(--border); vertical-align: middle; color: var(--txt-main); }
         .user-table tbody tr:last-child td { border-bottom: 0; }
-        .user-table tbody tr:hover { background: #fafcff; }
         .user-id { font-family: "Courier New", monospace; font-size: 0.78rem; color: var(--txt-sub); white-space: nowrap; }
         .user-name { font-weight: 700; }
         .user-email { color: var(--txt-sub); font-size: 0.82rem; margin-top: 0.15rem; }
@@ -167,12 +201,11 @@ export function AdminUserManagePage() {
         .user-date { color: var(--txt-sub); white-space: nowrap; }
         .user-actions { display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap; }
         .user-action-btn { border: 1px solid var(--border); background: var(--panel-soft); color: var(--txt-main); border-radius: 8px; padding: 0.38rem 0.65rem; font-size: 0.78rem; font-weight: 700; cursor: pointer; }
-        .user-action-btn:hover { background: var(--bg-1); }
         .user-action-btn.primary { border-color: #cfe0ff; background: #e8f1ff; color: var(--accent-2); }
         .user-action-btn.danger { border-color: #ffcdd2; background: #fff5f5; color: #c62828; }
         .user-action-btn:disabled { opacity: 0.5; cursor: not-allowed; }
         .user-empty { text-align: center; padding: 3rem 1rem; color: var(--txt-sub); }
-        .user-loading td { text-align: center; padding: 3rem; color: var(--txt-sub); }
+        .user-loading td, .user-unloaded td { text-align: center; padding: 3rem; color: var(--txt-sub); }
       `}</style>
 
       <div className="user-page">
@@ -209,16 +242,23 @@ export function AdminUserManagePage() {
           </div>
 
           {actionMessage ? <div className="user-toast">{actionMessage}</div> : null}
-          {error ? <div className="user-error">{error}</div> : null}
+          {error ? (
+            <div className="user-error">
+              <span>{error}</span>
+              <Link className="button" to="/login">
+                다시 로그인
+              </Link>
+            </div>
+          ) : null}
         </div>
 
         <div className="user-table-shell">
           <div className="user-table-head">
             <h3>사용자 목록</h3>
-            <span className="user-count-badge">{filteredItems.length}건</span>
+            <span className="user-count-badge">{hasLoaded ? filteredItems.length : "-"}건</span>
           </div>
 
-          {filteredItems.length === 0 && !loading ? (
+          {showEmptyState ? (
             <div className="user-empty">
               <p>조건에 맞는 사용자가 없습니다.</p>
             </div>
@@ -240,6 +280,10 @@ export function AdminUserManagePage() {
                   {loading ? (
                     <tr className="user-loading">
                       <td colSpan={7}>불러오는 중...</td>
+                    </tr>
+                  ) : !hasLoaded ? (
+                    <tr className="user-unloaded">
+                      <td colSpan={7}>사용자 목록을 불러오지 않았습니다.</td>
                     </tr>
                   ) : (
                     filteredItems.map((user) => {
