@@ -20,6 +20,10 @@ import TicketIssuePage from './src/pages/TicketIssuePage';
 import OrganizerEventDetailPage from './src/pages/OrganizerEventDetailPage';
 import OrganizerProfilePage from './src/pages/OrganizerProfilePage';
 import OrganizerLogoutPage from './src/pages/OrganizerLogoutPage';
+import SalesStatusPage from './src/pages/SalesStatusPage';
+import CheckInStatusPage from './src/pages/CheckInStatusPage';
+import EventSettingsPage from './src/pages/EventSettingsPage';
+import CheckInManagePage from './src/pages/CheckInManagePage';
 
 const Stack = createStackNavigator();
 
@@ -44,6 +48,10 @@ export default function App() {
           <Stack.Screen name="MyEvents" component={MyEventsPage} options={{ title: '내 이벤트' }} />
           <Stack.Screen name="TicketIssue" component={TicketIssuePage} options={{ title: '티켓 발행' }} />
           <Stack.Screen name="OrganizerEventDetail" component={OrganizerEventDetailPage} options={{ title: '이벤트 운영' }} />
+          <Stack.Screen name="SalesStatus" component={SalesStatusPage} options={{ title: '판매 현황' }} />
+          <Stack.Screen name="CheckInStatus" component={CheckInStatusPage} options={{ title: '체크인 현황' }} />
+          <Stack.Screen name="EventSettings" component={EventSettingsPage} options={{ title: '이벤트 정보 수정' }} />
+          <Stack.Screen name="CheckInManage" component={CheckInManagePage} options={{ title: '체크인 관리' }} />
           <Stack.Screen name="OrganizerProfile" component={OrganizerProfilePage} options={{ title: '내 정보 보기' }} />
           <Stack.Screen name="OrganizerLogout" component={OrganizerLogoutPage} options={{ title: '로그아웃' }} />
         </Stack.Navigator>

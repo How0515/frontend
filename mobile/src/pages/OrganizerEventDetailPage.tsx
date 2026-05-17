@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   ActivityIndicator,
@@ -7,13 +7,12 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { accountStatusMessage, errorMessage } from '../lib/account';
 import { backendApi } from '../lib/backend';
-import type { CheckInRecord, EventDetail, TicketDetail } from '../types/api';
+import type { EventDetail, TicketDetail } from '../types/api';
 
 function formatDate(value?: string) {
   if (!value) return '-';
@@ -37,25 +36,13 @@ export default function OrganizerEventDetailPage({ navigation, route }: any) {
   const eventId = route?.params?.eventId as string;
   const [event, setEvent] = useState<EventDetail | null>(null);
   const [tickets, setTickets] = useState<TicketDetail[]>([]);
-  const [checkIns, setCheckIns] = useState<CheckInRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [validatorId, setValidatorId] = useState('');
-  const [name, setName] = useState('');
-  const [category, setCategory] = useState('');
-  const [venue, setVenue] = useState('');
-  const [description, setDescription] = useState('');
-  const [eventAt, setEventAt] = useState('');
 
   const soldTickets = tickets.filter((ticket) => ticket.status === 'SOLD' || ticket.status === 'LISTED' || ticket.status === 'USED').length;
   const usedTickets = tickets.filter((ticket) => ticket.status === 'USED').length;
   const availableTickets = tickets.filter((ticket) => ticket.status === 'AVAILABLE').length;
-
-  const checkInSummary = useMemo(() => {
-    const success = checkIns.filter((record) => record.result === 'SUCCESS' || record.status === 'SUCCESS').length;
-    return { success, total: checkIns.length };
-  }, [checkIns]);
 
   const load = useCallback(async () => {
     if (!eventId) return;
@@ -70,18 +57,9 @@ export default function OrganizerEventDetailPage({ navigation, route }: any) {
 
       const detail = await backendApi.getEvent(eventId);
       const eventTickets = await backendApi.getEventTickets(eventId).catch(() => []);
-      const histories = await Promise.all(
-        eventTickets.map((ticket) => backendApi.getTicketCheckIns(ticketId(ticket)).catch(() => [])),
-      );
 
       setEvent(detail);
       setTickets(eventTickets);
-      setCheckIns(histories.flat());
-      setName(detail.name || detail.title || '');
-      setCategory(detail.category || '');
-      setVenue(detail.venue || '');
-      setDescription(detail.description || '');
-      setEventAt((detail.eventAt || detail.eventDateTime || '').slice(0, 16));
     } catch (error: any) {
       Alert.alert('이벤트 로드 실패', errorMessage(error, '이벤트 정보를 불러오지 못했습니다.'));
     } finally {
@@ -101,27 +79,6 @@ export default function OrganizerEventDetailPage({ navigation, route }: any) {
     void load();
   };
 
-  const saveEvent = async () => {
-    if (!event) return;
-    setSaving(true);
-    try {
-      const updated = await backendApi.updateEvent(event.id, {
-        name: name.trim() || null,
-        category: category.trim() || null,
-        venue: venue.trim() || null,
-        description: description.trim() || null,
-        eventAt: eventAt ? new Date(eventAt).toISOString() : null,
-      });
-      setEvent(updated);
-      Alert.alert('저장 완료', '이벤트 정보가 수정되었습니다.');
-      await load();
-    } catch (error: any) {
-      Alert.alert('저장 실패', errorMessage(error, '이벤트 정보를 수정하지 못했습니다.'));
-    } finally {
-      setSaving(false);
-    }
-  };
-
   const changeStatus = async (status: string) => {
     if (!event) return;
     setSaving(true);
@@ -130,24 +87,6 @@ export default function OrganizerEventDetailPage({ navigation, route }: any) {
       await load();
     } catch (error: any) {
       Alert.alert('상태 변경 실패', errorMessage(error, '상태를 변경하지 못했습니다.'));
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const addValidator = async () => {
-    if (!event || !validatorId.trim()) {
-      Alert.alert('입력 필요', '검증자로 등록할 사용자 ID를 입력해 주세요.');
-      return;
-    }
-
-    setSaving(true);
-    try {
-      await backendApi.addEventValidator(event.id, { userId: validatorId.trim() });
-      setValidatorId('');
-      Alert.alert('등록 완료', '체크인 검증자를 등록했습니다.');
-    } catch (error: any) {
-      Alert.alert('검증자 등록 실패', errorMessage(error, '검증자를 등록하지 못했습니다.'));
     } finally {
       setSaving(false);
     }
@@ -205,67 +144,44 @@ export default function OrganizerEventDetailPage({ navigation, route }: any) {
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>판매 현황</Text>
-        <View style={styles.statsRow}>
-          <Text style={styles.statText}>판매 {soldTickets}</Text>
-          <Text style={styles.statText}>잔여 {availableTickets}</Text>
-          <Text style={styles.statText}>가격 {weiToEth(event.ticketPriceWei)}</Text>
-        </View>
-      </View>
-
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>이벤트 정보 수정</Text>
-        <TextInput style={styles.input} value={name} onChangeText={setName} placeholder="이벤트명" />
-        <TextInput style={styles.input} value={category} onChangeText={setCategory} placeholder="카테고리" />
-        <TextInput style={styles.input} value={venue} onChangeText={setVenue} placeholder="장소" />
-        <TextInput style={styles.input} value={eventAt} onChangeText={setEventAt} placeholder="YYYY-MM-DDTHH:mm" />
-        <TextInput style={[styles.input, styles.textArea]} value={description} onChangeText={setDescription} placeholder="설명" multiline />
-        <TouchableOpacity style={[styles.primaryButton, saving && styles.disabledButton]} disabled={saving} onPress={saveEvent}>
-          <Text style={styles.primaryButtonText}>{saving ? '저장 중...' : '정보 저장'}</Text>
+        <Text style={styles.cardTitle}>운영 메뉴</Text>
+        <TouchableOpacity style={styles.menuButton} onPress={() => navigation.navigate('SalesStatus', { eventId: event.id })}>
+          <View>
+            <Text style={styles.menuTitle}>판매 현황 조회</Text>
+            <Text style={styles.menuText}>판매 {soldTickets} · 잔여 {availableTickets} · 가격 {weiToEth(event.ticketPriceWei)}</Text>
+          </View>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.menuButton} onPress={() => navigation.navigate('CheckInStatus', { eventId: event.id })}>
+          <View>
+            <Text style={styles.menuTitle}>체크인 현황 조회</Text>
+            <Text style={styles.menuText}>사용 처리 {usedTickets}건</Text>
+          </View>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.menuButton} onPress={() => navigation.navigate('EventSettings', { eventId: event.id })}>
+          <View>
+            <Text style={styles.menuTitle}>이벤트 정보 수정</Text>
+            <Text style={styles.menuText}>기본 정보, 일시, 장소를 수정합니다.</Text>
+          </View>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.menuButton} onPress={() => navigation.navigate('CheckInManage', { eventId: event.id })}>
+          <View>
+            <Text style={styles.menuTitle}>체크인 관리</Text>
+            <Text style={styles.menuText}>검증자 등록과 현장 운영을 관리합니다.</Text>
+          </View>
         </TouchableOpacity>
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>티켓 목록</Text>
-        {tickets.length === 0 ? (
-          <Text style={styles.emptyText}>아직 발행된 티켓이 없습니다.</Text>
-        ) : (
-          tickets.slice(0, 20).map((ticket) => (
-            <View key={ticketId(ticket)} style={styles.ticketRow}>
-              <View style={styles.ticketInfo}>
-                <Text style={styles.ticketTitle}>{ticket.seatInfo}</Text>
-                <Text style={styles.ticketMeta}>{ticket.ownerWalletAddress || ticket.ownerAddress || '미판매'}</Text>
-              </View>
-              <Text style={styles.badge}>{ticket.status}</Text>
+        <Text style={styles.cardTitle}>최근 티켓</Text>
+        {tickets.length === 0 ? <Text style={styles.emptyText}>아직 발행된 티켓이 없습니다.</Text> : tickets.slice(0, 5).map((ticket) => (
+          <View key={ticketId(ticket)} style={styles.ticketRow}>
+            <View style={styles.ticketInfo}>
+              <Text style={styles.ticketTitle}>{ticket.seatInfo}</Text>
+              <Text style={styles.ticketMeta}>{ticket.ownerWalletAddress || ticket.ownerAddress || '미판매'}</Text>
             </View>
-          ))
-        )}
-      </View>
-
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>체크인 현황</Text>
-        <Text style={styles.cardText}>성공 {checkInSummary.success}건 · 전체 시도 {checkInSummary.total}건</Text>
-        {checkIns.length === 0 ? (
-          <Text style={styles.emptyText}>체크인 기록이 없습니다.</Text>
-        ) : (
-          checkIns.slice(0, 12).map((record) => (
-            <View key={record.id ?? `${record.ticketId}-${record.checkedInAt}`} style={styles.ticketRow}>
-              <View style={styles.ticketInfo}>
-                <Text style={styles.ticketTitle}>{record.result ?? record.status}</Text>
-                <Text style={styles.ticketMeta}>{formatDate(record.checkedInAt || record.createdAt)} · {record.ticketId}</Text>
-              </View>
-            </View>
-          ))
-        )}
-      </View>
-
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>체크인 관리</Text>
-        <Text style={styles.cardText}>현장 검증자로 등록할 사용자 UUID를 입력합니다.</Text>
-        <TextInput style={styles.input} value={validatorId} onChangeText={setValidatorId} placeholder="사용자 UUID" autoCapitalize="none" />
-        <TouchableOpacity style={[styles.secondaryButton, saving && styles.disabledButton]} disabled={saving} onPress={addValidator}>
-          <Text style={styles.secondaryButtonText}>검증자 등록</Text>
-        </TouchableOpacity>
+            <Text style={styles.badge}>{ticket.status}</Text>
+          </View>
+        ))}
       </View>
     </ScrollView>
   );
@@ -289,8 +205,9 @@ const styles = StyleSheet.create({
   cardText: { marginTop: 8, color: '#64748B', lineHeight: 20 },
   statsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
   statText: { overflow: 'hidden', borderRadius: 999, backgroundColor: '#F1F5F9', color: '#334155', paddingHorizontal: 10, paddingVertical: 6, fontSize: 12, fontWeight: '800' },
-  input: { borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 12, padding: 12, marginTop: 10, backgroundColor: '#FFFFFF', color: '#0F172A' },
-  textArea: { minHeight: 96, textAlignVertical: 'top' },
+  menuButton: { borderTopWidth: 1, borderTopColor: '#F1F5F9', paddingVertical: 14 },
+  menuTitle: { color: '#0F172A', fontSize: 15, fontWeight: '900' },
+  menuText: { marginTop: 4, color: '#64748B', fontSize: 12 },
   primaryButton: { backgroundColor: '#2563EB', borderRadius: 14, paddingVertical: 14, alignItems: 'center', marginTop: 12 },
   primaryButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '900' },
   secondaryButton: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 14, paddingVertical: 14, alignItems: 'center', marginTop: 10 },

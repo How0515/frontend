@@ -34,6 +34,15 @@ function ethToWei(value: string) {
   return `${BigInt(whole || '0') * 1_000_000_000_000_000_000n + BigInt(fractionWei || '0')}`;
 }
 
+const EVENT_CATEGORIES = [
+  { value: 'CONCERT', label: '공연' },
+  { value: 'SPORTS', label: '스포츠' },
+  { value: 'EXHIBITION', label: '전시' },
+  { value: 'FESTIVAL', label: '페스티벌' },
+  { value: 'CONFERENCE', label: '컨퍼런스' },
+  { value: 'ETC', label: '기타' },
+];
+
 export default function EventCreatePage({ navigation }: any) {
   const tomorrow = useMemo(() => {
     const date = new Date();
@@ -168,12 +177,32 @@ export default function EventCreatePage({ navigation }: any) {
           </View>
         ) : null}
 
+        <TouchableOpacity
+          style={[styles.topSubmitButton, (submitting || created) && styles.disabledButton]}
+          disabled={submitting || created}
+          onPress={createEvent}
+        >
+          <Text style={styles.primaryButtonText}>{submitting ? '등록 중...' : created ? '등록 완료' : '이벤트 등록 후 티켓 발행'}</Text>
+        </TouchableOpacity>
+
         <View style={styles.card}>
           <Text style={styles.label}>이벤트명</Text>
           <TextInput style={styles.input} value={name} onChangeText={setName} placeholder="예: TRUST LIVE 2026" />
 
           <Text style={styles.label}>카테고리</Text>
-          <TextInput style={styles.input} value={category} onChangeText={setCategory} autoCapitalize="characters" />
+          <View style={styles.categoryGrid}>
+            {EVENT_CATEGORIES.map((item) => (
+              <TouchableOpacity
+                key={item.value}
+                style={[styles.categoryChip, category === item.value && styles.activeCategoryChip]}
+                onPress={() => setCategory(item.value)}
+              >
+                <Text style={[styles.categoryChipText, category === item.value && styles.activeCategoryChipText]}>
+                  {item.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
 
           <Text style={styles.label}>장소</Text>
           <TextInput style={styles.input} value={venue} onChangeText={setVenue} placeholder="예: 서울 올림픽공원" />
@@ -227,7 +256,7 @@ export default function EventCreatePage({ navigation }: any) {
           disabled={submitting || created}
           onPress={createEvent}
         >
-          <Text style={styles.primaryButtonText}>{submitting ? '등록 중...' : created ? '등록 완료' : '이벤트 등록'}</Text>
+          <Text style={styles.primaryButtonText}>{submitting ? '등록 중...' : created ? '등록 완료' : '이벤트 등록 후 티켓 발행'}</Text>
         </TouchableOpacity>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -237,7 +266,7 @@ export default function EventCreatePage({ navigation }: any) {
 const styles = StyleSheet.create({
   keyboard: { flex: 1 },
   container: { flex: 1, backgroundColor: '#F4F7FB' },
-  content: { padding: 18, paddingBottom: 36 },
+  content: { padding: 18, paddingBottom: 96 },
   eyebrow: { color: '#2563EB', fontWeight: '800', fontSize: 12, letterSpacing: 0.5 },
   title: { marginTop: 4, fontSize: 28, fontWeight: '900', color: '#0F172A' },
   subtitle: { marginTop: 8, color: '#64748B', fontSize: 14, lineHeight: 21 },
@@ -248,7 +277,13 @@ const styles = StyleSheet.create({
   errorText: { color: '#DC2626' },
   successText: { color: '#047857' },
   card: { marginTop: 16, backgroundColor: '#FFFFFF', borderRadius: 18, padding: 16, borderWidth: 1, borderColor: '#E2E8F0' },
+  topSubmitButton: { backgroundColor: '#2563EB', borderRadius: 14, paddingVertical: 15, alignItems: 'center', marginTop: 14 },
   label: { marginTop: 12, marginBottom: 6, color: '#334155', fontSize: 13, fontWeight: '800' },
+  categoryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  categoryChip: { borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: '#FFFFFF' },
+  activeCategoryChip: { borderColor: '#2563EB', backgroundColor: '#EFF6FF' },
+  categoryChipText: { color: '#475569', fontWeight: '800', fontSize: 13 },
+  activeCategoryChipText: { color: '#2563EB' },
   input: { borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 12, padding: 12, backgroundColor: '#FFFFFF', color: '#0F172A' },
   textArea: { minHeight: 100, textAlignVertical: 'top' },
   toggleRow: { marginTop: 14, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 12, padding: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
