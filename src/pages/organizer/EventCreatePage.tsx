@@ -28,17 +28,17 @@ export function EventCreatePage() {
 
   return (
     <section className="panel">
-      <h2>Create Event</h2>
+      <h2>이벤트 등록</h2>
       <form className="form" onSubmit={onSubmit}>
-        <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Event name" />
-        <input value={venue} onChange={(e) => setVenue(e.target.value)} placeholder="Venue" />
+        <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="이벤트명" />
+        <input value={venue} onChange={(e) => setVenue(e.target.value)} placeholder="장소" />
         <input
           value={eventDateTime}
           onChange={(e) => setEventDateTime(e.target.value)}
           placeholder="2026-12-24T19:00:00"
         />
         <button className="button primary" type="submit">
-          Create
+          등록
         </button>
       </form>
       {message ? <p>{message}</p> : null}

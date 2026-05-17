@@ -11,7 +11,7 @@ export function MyEventsPage() {
 
   return (
     <section className="panel">
-      <h2>My Events</h2>
+      <h2>내 이벤트</h2>
       <div className="card-grid">
         {events.map((event) => (
           <article className="event-card" key={event.id}>

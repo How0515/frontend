@@ -25,11 +25,11 @@ export function EventDetailPage() {
 
   return (
     <section className="panel">
-      <h2>Event Detail</h2>
+      <h2>이벤트 상세</h2>
       <pre className="code">{JSON.stringify(event, null, 2)}</pre>
       <div className="action-row">
         <button className="button primary" onClick={() => void onPrimaryPurchase()}>
-          Buy ticket (off-chain API)
+          티켓 구매
         </button>
       </div>
       {message ? <p>{message}</p> : null}

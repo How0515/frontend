@@ -12,7 +12,7 @@ export function MyPage() {
 
   return (
     <section className="panel">
-      <h2>My Page</h2>
+      <h2>마이페이지</h2>
       <div className="card-grid">
         {tickets.map((ticket) => (
           <Link

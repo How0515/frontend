@@ -12,14 +12,14 @@ export function ResaleListPage() {
 
   return (
     <section className="panel">
-      <h2>Resale Listings</h2>
+      <h2>리셀 목록</h2>
       <div className="card-grid">
         {items.map((item) => (
           <Link key={item.listingId} className="event-card" to={`/user/resale/${item.listingId}`}>
             <h3>{item.eventName}</h3>
-            <p>Seat: {item.seatInfo}</p>
-            <p>Price: {item.price}</p>
-            <p>Status: {item.status}</p>
+            <p>좌석: {item.seatInfo}</p>
+            <p>가격: {item.price}</p>
+            <p>상태: {item.status}</p>
           </Link>
         ))}
       </div>

@@ -3,20 +3,20 @@ import { Link } from "react-router-dom";
 export function OrganizerDashboardPage() {
   return (
     <section className="panel">
-      <h2>Organizer Dashboard</h2>
-      <p>Create events, issue tickets, and monitor check-ins from one flow.</p>
+      <h2>주최자 대시보드</h2>
+      <p>이벤트 등록, 티켓 발행, 체크인 관리를 한 곳에서 수행합니다.</p>
       <div className="action-row">
         <Link className="button primary" to="/organizer/events/new">
-          New event
+          이벤트 등록
         </Link>
         <Link className="button" to="/organizer/events">
-          My events
+          내 이벤트
         </Link>
         <Link className="button" to="/organizer/me">
-          My profile
+          내 정보
         </Link>
         <Link className="button" to="/organizer/start">
-          Start screen
+          시작 화면
         </Link>
       </div>
     </section>

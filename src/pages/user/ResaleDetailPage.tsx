@@ -26,10 +26,10 @@ export function ResaleDetailPage() {
 
   return (
     <section className="panel">
-      <h2>Resale Detail</h2>
+      <h2>리셀 상세</h2>
       <pre className="code">{JSON.stringify(item, null, 2)}</pre>
       <button className="button primary" onClick={() => void onPurchase()}>
-        Purchase resale
+        리셀 구매
       </button>
       {message ? <p>{message}</p> : null}
     </section>

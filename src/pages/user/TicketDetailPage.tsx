@@ -19,12 +19,12 @@ export function TicketDetailPage() {
 
   return (
     <section className="panel">
-      <h2>Ticket Detail</h2>
+      <h2>티켓 상세</h2>
       <pre className="code">{JSON.stringify(ticket, null, 2)}</pre>
       <div className="row">
         <input value={resalePrice} onChange={(e) => setResalePrice(e.target.value)} />
         <button className="button" onClick={() => void onResaleSubmit()}>
-          Create resale listing
+          리셀 등록
         </button>
       </div>
       {message ? <p>{message}</p> : null}
