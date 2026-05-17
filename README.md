@@ -51,6 +51,55 @@ roles: USER, ORGANIZER, ADMIN, VALIDATOR
 
 백엔드 서버가 이미 실행 중이었다면 재시작해야 계정 bootstrap이 반영됩니다.
 
+## 모바일 주최자 앱
+
+#### 주요 화면 :
+
+```text
+LandingPage                 시작 화면
+AuthPage                    이메일/지갑 로그인, 회원가입
+OrganizerDashboardPage      주최자 센터
+OrganizerProfilePage        내 정보 보기
+OrganizerLogoutPage         로그아웃
+EventCreatePage             이벤트 등록
+TicketIssuePage             티켓 발행
+MyEventsPage                내 이벤트 목록
+OrganizerEventDetailPage    이벤트 운영 상세
+SalesStatusPage             판매 현황 조회
+CheckInStatusPage           체크인 현황 조회
+EventSettingsPage           이벤트 정보 수정, 상태 변경, 리셀 정책 수정
+CheckInManagePage           체크인 관리, 검증자 등록, QR payload 입장 처리
+CheckInScanPage             카메라 QR 스캔
+```
+
+#### 구현된 주최자 흐름 :
+
+- 시작 화면에서 사용자/주최자 진입 분기
+- 이메일 로그인/회원가입 후 권한과 진입 목적에 맞는 화면 이동
+- 지갑 로그인 API 흐름 연결: nonce 발급, 서명값 입력, 지갑 로그인
+- 일반 사용자는 주최자 신청 화면 표시
+- 주최자 신청 상태 표시: 대기, 거절, 재신청, 승인 후 주최자 센터 전환
+- 정지/삭제 등 사용할 수 없는 계정은 주최자 기능 차단
+- 주최자 센터: 운영 지표, 이벤트 등록, 내 이벤트, 내 정보 이동
+- 내 정보 보기: 프로필 조회, 표시 이름 수정, 로그아웃
+- 이벤트 등록: 카테고리 선택, 날짜/시간 입력 형식 안내, 가격/수량/리셀 정책 입력
+- 이벤트 등록 성공 후 티켓 발행 화면으로 이동
+- 티켓 발행: 총 티켓/발행 완료/미발행 기준으로 좌석 구역과 수량 발행
+- 내 이벤트 목록: 이벤트 상태 표시, 취소 이벤트 하단 정렬
+- 이벤트 운영 상세: 판매/체크인/설정/체크인 관리 화면으로 분기
+- 판매 현황: 티켓별 판매 상태와 집계 조회
+- 체크인 현황: 입장 완료, 성공 기록, 전체 시도 조회
+- 이벤트 설정: 기본 정보, 이미지 URL, 상태, 리셀 정책 수정
+- 체크인 관리: 검증자 등록, QR payload 붙여넣기, QR 스캔, 입장 처리 API 연동
+- 이벤트 취소: 물리 삭제 대신 `CANCELED` 상태 변경
+
+#### 주의 사항 :
+
+- 이벤트 삭제 API는 없으며, 관리자/주최자 모두 `CANCELED` 상태 변경으로 취소 처리합니다.
+- 카메라 QR 스캔은 `expo-camera`를 사용하므로 실제 기기 또는 에뮬레이터 테스트가 필요합니다.
+- Expo Web에서는 모바일 앱처럼 드래그 스크롤이 동작하지 않을 수 있어, 주요 액션은 상단에도 배치했습니다.
+- 이미지 파일 업로드 UI는 아직 없고, 현재는 이미지 URL 수정 방식으로 이벤트 이미지를 관리합니다.
+
 ## 실행
 
 관리자 웹:
@@ -69,6 +118,16 @@ npm install
 npx expo start --web
 ```
 
+모바일 앱 실제 기기/에뮬레이터:
+
+```bash
+cd frontend/mobile
+npm install
+npm run android
+# 또는
+npm run ios
+```
+
 백엔드:
 
 ```bash
@@ -83,6 +142,13 @@ cd backend
 ```bash
 cd frontend
 npx tsc -p tsconfig.app.json --noEmit --incremental false
+```
+
+모바일 타입 체크:
+
+```bash
+cd frontend/mobile
+npx tsc --noEmit
 ```
 
 백엔드 컴파일:
