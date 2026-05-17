@@ -20,12 +20,16 @@ export default function AuthPage({ navigation, route }: any) {
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [loading, setLoading] = useState(false);
+  const [feedback, setFeedback] = useState<{ type: 'error' | 'success'; message: string } | null>(null);
 
   const targetLabel = useMemo(() => (initialRole === 'ORGANIZER' ? '주최자' : '사용자'), [initialRole]);
 
   const handleEmailAuth = async () => {
+    setFeedback(null);
     if (!email.trim() || !password) {
-      Alert.alert('입력 필요', '이메일과 비밀번호를 입력해 주세요.');
+      const message = '이메일과 비밀번호를 입력해 주세요.';
+      setFeedback({ type: 'error', message });
+      Alert.alert('입력 필요', message);
       return;
     }
 
@@ -36,6 +40,7 @@ export default function AuthPage({ navigation, route }: any) {
         const profile = result.user ?? await backendApi.getMe();
         const statusMessage = accountStatusMessage(profile.status);
         if (statusMessage) {
+          setFeedback({ type: 'error', message: statusMessage });
           Alert.alert('로그인 실패', statusMessage);
           return;
         }
@@ -43,18 +48,23 @@ export default function AuthPage({ navigation, route }: any) {
         navigation.replace(routeForEntry(profile, initialRole));
       } else {
         if (!displayName.trim()) {
-          Alert.alert('입력 필요', '이름을 입력해 주세요.');
+          const message = '이름을 입력해 주세요.';
+          setFeedback({ type: 'error', message });
+          Alert.alert('입력 필요', message);
           return;
         }
 
         const result = await backendApi.registerEmail({ email: email.trim(), password, displayName: displayName.trim() });
         const profile = result.user ?? await backendApi.getMe();
-        Alert.alert('회원가입 완료', initialRole === 'ORGANIZER' ? '가입되었습니다. 주최자 신청을 이어서 진행해 주세요.' : '가입되었습니다.', [
-          { text: '확인', onPress: () => navigation.replace(routeForEntry(profile, initialRole)) },
-        ]);
+        const message = initialRole === 'ORGANIZER' ? '가입되었습니다. 주최자 신청을 이어서 진행해 주세요.' : '가입되었습니다.';
+        setFeedback({ type: 'success', message });
+        Alert.alert('회원가입 완료', message);
+        navigation.replace(routeForEntry(profile, initialRole));
       }
     } catch (error: any) {
-      Alert.alert(isLogin ? '로그인 실패' : '회원가입 실패', errorMessage(error, '요청을 처리하지 못했습니다.'));
+      const message = errorMessage(error, '요청을 처리하지 못했습니다.');
+      setFeedback({ type: 'error', message });
+      Alert.alert(isLogin ? '로그인 실패' : '회원가입 실패', message);
     } finally {
       setLoading(false);
     }
@@ -80,6 +90,14 @@ export default function AuthPage({ navigation, route }: any) {
         </View>
 
         <View style={styles.form}>
+          {feedback ? (
+            <View style={[styles.messageBox, feedback.type === 'success' ? styles.successBox : styles.errorBox]}>
+              <Text style={[styles.messageText, feedback.type === 'success' ? styles.successText : styles.errorText]}>
+                {feedback.message}
+              </Text>
+            </View>
+          ) : null}
+
           {!isLogin ? (
             <TextInput
               style={styles.input}
@@ -146,6 +164,12 @@ const styles = StyleSheet.create({
   tabText: { fontSize: 16, color: '#64748B', fontWeight: '800' },
   activeTabText: { color: '#2563EB' },
   form: { gap: 12 },
+  messageBox: { borderRadius: 12, padding: 12, borderWidth: 1 },
+  errorBox: { backgroundColor: '#FEF2F2', borderColor: '#FECACA' },
+  successBox: { backgroundColor: '#ECFDF5', borderColor: '#BBF7D0' },
+  messageText: { fontSize: 13, fontWeight: '800', lineHeight: 19 },
+  errorText: { color: '#DC2626' },
+  successText: { color: '#047857' },
   input: { backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#CBD5E1', padding: 15, borderRadius: 12, fontSize: 16 },
   primaryButton: { backgroundColor: '#2563EB', padding: 17, borderRadius: 14, alignItems: 'center', marginTop: 6 },
   primaryButtonText: { color: '#FFFFFF', fontSize: 17, fontWeight: '900' },

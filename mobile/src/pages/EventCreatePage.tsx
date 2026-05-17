@@ -53,44 +53,51 @@ export default function EventCreatePage({ navigation }: any) {
   const [maxResaleRate, setMaxResaleRate] = useState('120');
   const [submitting, setSubmitting] = useState(false);
   const [created, setCreated] = useState(false);
+  const [feedback, setFeedback] = useState<{ type: 'error' | 'success'; message: string } | null>(null);
+
+  const showError = (title: string, message: string) => {
+    setFeedback({ type: 'error', message });
+    Alert.alert(title, message);
+  };
 
   const createEvent = async () => {
+    setFeedback(null);
     if (!name.trim()) {
-      Alert.alert('입력 필요', '이벤트명을 입력해야 등록할 수 있습니다.');
+      showError('입력 필요', '이벤트명을 입력해야 등록할 수 있습니다.');
       return;
     }
     if (!category.trim()) {
-      Alert.alert('입력 필요', '카테고리를 입력해야 등록할 수 있습니다.');
+      showError('입력 필요', '카테고리를 입력해야 등록할 수 있습니다.');
       return;
     }
     if (!venue.trim()) {
-      Alert.alert('입력 필요', '장소를 입력해야 등록할 수 있습니다.');
+      showError('입력 필요', '장소를 입력해야 등록할 수 있습니다.');
       return;
     }
     if (!eventAt.trim()) {
-      Alert.alert('입력 필요', '이벤트 일시를 입력해야 등록할 수 있습니다.');
+      showError('입력 필요', '이벤트 일시를 입력해야 등록할 수 있습니다.');
       return;
     }
     if (!ticketPriceEth.trim()) {
-      Alert.alert('입력 필요', '티켓 가격을 입력해야 등록할 수 있습니다.');
+      showError('입력 필요', '티켓 가격을 입력해야 등록할 수 있습니다.');
       return;
     }
     if (!totalTicketCount.trim()) {
-      Alert.alert('입력 필요', '총 티켓 수를 입력해야 등록할 수 있습니다.');
+      showError('입력 필요', '총 티켓 수를 입력해야 등록할 수 있습니다.');
       return;
     }
 
     const count = Number(totalTicketCount);
     if (!Number.isInteger(count) || count <= 0) {
-      Alert.alert('입력 오류', '티켓 수량은 1 이상의 정수여야 합니다.');
+      showError('입력 오류', '티켓 수량은 1 이상의 정수여야 합니다.');
       return;
     }
     if (Number.isNaN(Number(ticketPriceEth)) || Number(ticketPriceEth) < 0) {
-      Alert.alert('입력 오류', '티켓 가격은 0 이상의 숫자여야 합니다.');
+      showError('입력 오류', '티켓 가격은 0 이상의 숫자여야 합니다.');
       return;
     }
     if (Number.isNaN(Number(maxResaleRate)) || Number(maxResaleRate) < 100) {
-      Alert.alert('입력 오류', '최대 리셀 가격 비율은 100 이상이어야 합니다.');
+      showError('입력 오류', '최대 리셀 가격 비율은 100 이상이어야 합니다.');
       return;
     }
 
@@ -99,7 +106,7 @@ export default function EventCreatePage({ navigation }: any) {
       const profile = await backendApi.getMe();
       const statusMessage = accountStatusMessage(profile.status);
       if (statusMessage) {
-        Alert.alert('등록 불가', statusMessage);
+        showError('등록 불가', statusMessage);
         return;
       }
 
@@ -136,11 +143,11 @@ export default function EventCreatePage({ navigation }: any) {
       });
 
       setCreated(true);
-      Alert.alert('등록 완료', '이벤트가 등록되었습니다.', [
-        { text: '티켓 발행으로 이동', onPress: () => navigation.replace('TicketIssue', { eventId: createdEvent.id }) },
-      ]);
+      setFeedback({ type: 'success', message: '이벤트가 등록되었습니다. 티켓 발행 페이지로 이동합니다.' });
+      Alert.alert('등록 완료', '이벤트가 등록되었습니다. 티켓 발행 페이지로 이동합니다.');
+      navigation.replace('TicketIssue', { eventId: createdEvent.id });
     } catch (error: any) {
-      Alert.alert('등록 실패', errorMessage(error, '이벤트를 등록하지 못했습니다.'));
+      showError('등록 실패', errorMessage(error, '이벤트를 등록하지 못했습니다.'));
     } finally {
       setSubmitting(false);
     }
@@ -152,6 +159,14 @@ export default function EventCreatePage({ navigation }: any) {
         <Text style={styles.eyebrow}>Create Event</Text>
         <Text style={styles.title}>이벤트 등록</Text>
         <Text style={styles.subtitle}>판매 기간과 리셀 정책은 기본값으로 생성되며, 등록 후 웹/관리 화면에서 조정할 수 있습니다.</Text>
+
+        {feedback ? (
+          <View style={[styles.messageBox, feedback.type === 'success' ? styles.successBox : styles.errorBox]}>
+            <Text style={[styles.messageText, feedback.type === 'success' ? styles.successText : styles.errorText]}>
+              {feedback.message}
+            </Text>
+          </View>
+        ) : null}
 
         <View style={styles.card}>
           <Text style={styles.label}>이벤트명</Text>
@@ -226,6 +241,12 @@ const styles = StyleSheet.create({
   eyebrow: { color: '#2563EB', fontWeight: '800', fontSize: 12, letterSpacing: 0.5 },
   title: { marginTop: 4, fontSize: 28, fontWeight: '900', color: '#0F172A' },
   subtitle: { marginTop: 8, color: '#64748B', fontSize: 14, lineHeight: 21 },
+  messageBox: { marginTop: 14, borderRadius: 12, padding: 12, borderWidth: 1 },
+  errorBox: { backgroundColor: '#FEF2F2', borderColor: '#FECACA' },
+  successBox: { backgroundColor: '#ECFDF5', borderColor: '#BBF7D0' },
+  messageText: { fontSize: 13, fontWeight: '800', lineHeight: 19 },
+  errorText: { color: '#DC2626' },
+  successText: { color: '#047857' },
   card: { marginTop: 16, backgroundColor: '#FFFFFF', borderRadius: 18, padding: 16, borderWidth: 1, borderColor: '#E2E8F0' },
   label: { marginTop: 12, marginBottom: 6, color: '#334155', fontSize: 13, fontWeight: '800' },
   input: { borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 12, padding: 12, backgroundColor: '#FFFFFF', color: '#0F172A' },
