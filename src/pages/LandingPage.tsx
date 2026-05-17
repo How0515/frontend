@@ -31,9 +31,9 @@ export function LandingPage() {
   return (
     <section className="hero">
       <div>
-        <p className="eyebrow">경희 블록체인 2026</p>
-        <h1>온체인 신뢰, 오프체인 속도의 티켓팅</h1>
-        <p className="lead">사용자·주최자는 앱 형태로 제공되며, 관리자는 웹으로 운영됩니다.</p>
+        <p className="eyebrow">Trust Ticket</p>
+        <h1>온체인 신뢰로 운영하는 티켓 플랫폼</h1>
+        <p className="lead">사용자와 주최자는 모바일 앱으로, 운영은 관리자 웹 포털로 분리합니다.</p>
       </div>
       <div className="action-row">
         <Link className="button primary" to="/login">
@@ -41,9 +41,6 @@ export function LandingPage() {
         </Link>
         <Link className="button" to="/register">
           회원가입
-        </Link>
-        <Link className="button" to="/organizer">
-          주최자 앱
         </Link>
         <Link className="button" to="/admin">
           관리자 웹

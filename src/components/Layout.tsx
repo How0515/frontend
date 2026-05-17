@@ -1,33 +1,66 @@
-import { Link, Outlet, useLocation } from "react-router-dom";
+import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 
-const links = [
-  { to: "/app", label: "사용자 앱" },
-  { to: "/organizer", label: "주최자 앱" },
-  { to: "/admin", label: "관리자 웹" },
+const adminLinks = [
+  { to: "/admin", label: "관리자 대시보드", end: true },
+  { to: "/admin/organizer-approvals", label: "주최자 승인" },
+  { to: "/admin/events", label: "이벤트 감독" },
+  { to: "/admin/users", label: "사용자 관리" },
+  { to: "/admin/disputes", label: "분쟁/거래 센터" },
+  { to: "/admin/blockchain", label: "블록체인 로그" },
 ];
 
 export function Layout() {
   const { pathname } = useLocation();
-  const hideShell = pathname.startsWith("/app") || pathname.startsWith("/organizer");
+  const isAdminRoute = pathname.startsWith("/admin");
+
+  if (isAdminRoute) {
+    return (
+      <div className="admin-shell">
+        <aside className="admin-sidebar">
+          <Link className="brand brand-admin" to="/admin">
+            TRUST TICKET
+          </Link>
+          <div className="sidebar-title">메뉴</div>
+          <nav className="sidebar-nav">
+            {adminLinks.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.end}
+                className={({ isActive }) => (isActive ? "sidebar-link active" : "sidebar-link")}
+              >
+                {item.label}
+              </NavLink>
+            ))}
+          </nav>
+        </aside>
+
+        <div className="admin-main">
+          <header className="admin-topbar">
+            <div>
+              <p className="eyebrow">관리자 웹 포털</p>
+              <h1>관리자 대시보드</h1>
+            </div>
+            <Link className="button" to="/login">
+              로그인
+            </Link>
+          </header>
+
+          <main className="content admin-content">
+            <Outlet />
+          </main>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="app-shell">
-      {!hideShell ? (
-        <>
-          <header className="topbar">
-            <Link className="brand" to="/">
-              TRUST TICKET
-            </Link>
-          </header>
-          <nav className="nav-grid">
-            {links.map((item) => (
-              <Link key={item.to} to={item.to} className="nav-chip">
-                {item.label}
-              </Link>
-            ))}
-          </nav>
-        </>
-      ) : null}
+      <header className="topbar">
+        <Link className="brand" to="/">
+          TRUST TICKET
+        </Link>
+      </header>
 
       <main className="content">
         <Outlet />

@@ -27,23 +27,34 @@ export function OrganizerApprovalsPage() {
 
   return (
     <section className="panel">
-      <h2>Organizer Approvals</h2>
-      <div className="card-grid">
+      <p className="eyebrow">주최자 관리</p>
+      <h2>주최자 승인</h2>
+      <div className="table-shell">
+        <header className="table-head">
+          <h3>승인 대기 목록</h3>
+          <span className="badge warning">{items.length}건</span>
+        </header>
+        <div className="table-list">
         {items.map((item) => (
-          <article className="event-card" key={item.id ?? JSON.stringify(item)}>
+          <article className="table-row" key={item.id ?? JSON.stringify(item)}>
+            <div>
+              <strong>{String(item.userId ?? item.id ?? "unknown")}</strong>
+              <p className="table-subtext">{String(item.status ?? "PENDING")}</p>
+            </div>
             <pre className="code">{JSON.stringify(item, null, 2)}</pre>
             {item.id ? (
-              <div className="action-row">
+              <div className="action-row align-right">
                 <button className="button primary" onClick={() => void review(item.id as string, "APPROVED")}>
-                  Approve
+                  승인
                 </button>
                 <button className="button" onClick={() => void review(item.id as string, "REJECTED")}>
-                  Reject
+                  거절
                 </button>
               </div>
             ) : null}
           </article>
         ))}
+        </div>
       </div>
     </section>
   );
