@@ -25,14 +25,14 @@ export default function MyTicketsPage({ navigation }: any) {
   const renderTicket = ({ item }: { item: TicketDetail }) => (
     <TouchableOpacity 
       style={styles.ticketCard}
-      onPress={() => navigation.navigate('TicketDetail', { ticketId: item.id })}
+      onPress={() => navigation.navigate('TicketDetail', { ticketId: item.id ?? item.ticketId })}
     >
       <View style={styles.ticketInfo}>
-        <Text style={styles.eventTitle}>{item.eventTitle}</Text>
+        <Text style={styles.eventTitle}>{item.eventTitle ?? item.eventName}</Text>
         <Text style={styles.ticketDetails}>
           {item.seatInfo} | {item.status}
         </Text>
-        <Text style={styles.ticketPrice}>{item.priceWei} WEI</Text>
+        <Text style={styles.ticketPrice}>{item.priceWei ? `${item.priceWei} WEI` : ''}</Text>
       </View>
       <View style={styles.statusBadge}>
         <Text style={styles.statusText}>상세보기</Text>
@@ -49,7 +49,7 @@ export default function MyTicketsPage({ navigation }: any) {
       ) : (
         <FlatList
           data={tickets}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item) => String(item.id ?? item.ticketId)}
           renderItem={renderTicket}
           contentContainerStyle={styles.list}
           ListEmptyComponent={

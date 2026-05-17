@@ -24,21 +24,18 @@ export default function App() {
     <SafeAreaProvider>
       <NavigationContainer>
         <Stack.Navigator initialRouteName="Landing">
-          {/* Auth Flow */}
           <Stack.Screen name="Landing" component={LandingPage} options={{ headerShown: false }} />
           <Stack.Screen name="Auth" component={AuthPage} options={{ title: '인증' }} />
 
-          {/* User Flows */}
           <Stack.Screen name="Main" component={UserHomePage} options={{ title: 'Trust Ticket' }} />
           <Stack.Screen name="EventDetail" component={EventDetailPage} options={{ title: '이벤트 상세' }} />
           <Stack.Screen name="ResaleList" component={ResaleListPage} options={{ title: '리셀 목록' }} />
           <Stack.Screen name="MyPage" component={MyPage} options={{ title: '마이페이지' }} />
-          <Stack.Screen name="MyTickets" component={MyTicketsPage} options={{ title: '내 티켓 관리' }} />
+          <Stack.Screen name="MyTickets" component={MyTicketsPage} options={{ title: '내 티켓' }} />
           <Stack.Screen name="TicketDetail" component={TicketDetailPage} options={{ title: '티켓 상세' }} />
-          <Stack.Screen name="TicketResaleCreate" component={TicketResaleCreatePage} options={{ title: '리셀 판매 등록' }} />
+          <Stack.Screen name="TicketResaleCreate" component={TicketResaleCreatePage} options={{ title: '리셀 등록' }} />
 
-          {/* Organizer Flows */}
-          <Stack.Screen name="Organizer" component={OrganizerDashboardPage} options={{ title: '주최자 대시보드' }} />
+          <Stack.Screen name="Organizer" component={OrganizerDashboardPage} options={{ title: '주최자 센터' }} />
           <Stack.Screen name="EventCreate" component={EventCreatePage} options={{ title: '이벤트 등록' }} />
           <Stack.Screen name="MyEvents" component={MyEventsPage} options={{ title: '내 이벤트' }} />
         </Stack.Navigator>

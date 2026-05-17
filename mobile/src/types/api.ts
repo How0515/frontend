@@ -46,13 +46,18 @@ export type AuthTokens = {
 
 export type EventSummary = {
   id: string;
-  title: string;
+  title?: string;
+  name?: string;
   description?: string;
   venue: string;
-  eventDateTime: string;
+  eventDateTime?: string;
+  eventAt?: string;
   status: string;
   category?: string;
   soldOut?: boolean;
+  totalTicketCount?: number;
+  soldTicketCount?: number;
+  remainingTicketCount?: number;
 };
 
 export type EventDetail = EventSummary & {
@@ -70,17 +75,26 @@ export type EventDetail = EventSummary & {
 };
 
 export type TicketDetail = {
-  ticketId: number;
+  id?: string;
+  ticketId: number | string;
   eventId: string;
   eventName: string;
+  eventTitle?: string;
+  venue?: string;
+  eventDateTime?: string;
   seatInfo: string;
   status: string;
+  priceWei?: string;
+  ownerAddress?: string;
   qrImageUrl?: string;
 };
 
 export type OrganizerApplication = {
   id?: string;
   userId?: string;
+  businessName?: string;
+  contactEmail?: string;
+  description?: string;
   status?: string;
   createdAt?: string;
   updatedAt?: string;

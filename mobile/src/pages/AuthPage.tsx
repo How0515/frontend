@@ -1,100 +1,98 @@
-import React, { useState } from 'react';
-import { StyleSheet, View, Text, TextInput, TouchableOpacity, Alert, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import {
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { backendApi } from '../lib/backend';
 
 export default function AuthPage({ navigation, route }: any) {
+  const initialRole = route?.params?.initialRole ?? 'USER';
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleEmailAuth = async () => {
-    console.log('Email Auth Attempt:', { isLogin, email });
-    try {
-      if (isLogin) {
-        const res = await backendApi.loginEmail({ email, password });
-        console.log('Login Success:', res);
-        navigateByRole(res.roles);
-      } else {
-        const res = await backendApi.registerEmail({ email, password, displayName });
-        console.log('Register Success:', res);
-        if (Platform.OS === 'web') {
-          alert('회원가입 완료: 가입되었습니다. 로그인해 주세요.');
-          setIsLogin(true);
-        } else {
-          Alert.alert('회원가입 완료', '가입되었습니다. 로그인해 주세요.', [
-            { text: '확인', onPress: () => setIsLogin(true) }
-          ]);
-        }
-      }
-    } catch (error: any) {
-      console.error('Auth Error:', error);
-      const msg = error.response?.data?.message || error.message || '인증에 실패했습니다.';
-      if (Platform.OS === 'web') alert('오류: ' + msg);
-      else Alert.alert('오류', msg);
-    }
-  };
+  const targetLabel = useMemo(() => (initialRole === 'ORGANIZER' ? '주최자' : '사용자'), [initialRole]);
 
-  const handleWalletAuth = async () => {
-    console.log('Wallet Auth Attempt');
-    const msg = '지갑 인증 기능은 모바일 브라우저 또는 전용 지갑 앱 연동이 필요합니다. (준비 중)';
-    if (Platform.OS === 'web') alert(msg);
-    else Alert.alert('안내', msg);
-  };
-
-  const navigateByRole = (roles: string[]) => {
-    console.log('Navigating with roles:', roles);
-    
-    // roles가 없거나 배열이 아닌 경우에 대한 방어 코드
-    const safeRoles = Array.isArray(roles) ? roles : [];
-
-    if (safeRoles.includes('ADMIN')) {
-      const msg = '관리자 계정입니다. 관리자 기능은 웹(Admin Portal)에서 이용해 주세요.';
-      if (Platform.OS === 'web') alert(msg);
-      else Alert.alert('관리자 계정', msg);
+  const moveAfterLogin = (roles: string[]) => {
+    if (roles.includes('ORGANIZER') || roles.includes('ADMIN')) {
+      navigation.replace('Organizer');
       return;
     }
 
-    if (safeRoles.includes('ORGANIZER')) {
+    if (initialRole === 'ORGANIZER') {
       navigation.replace('Organizer');
-    } else {
-      // 기본적으로 USER 페이지로 이동
-      navigation.replace('Main');
+      return;
+    }
+
+    navigation.replace('Main');
+  };
+
+  const handleEmailAuth = async () => {
+    if (!email.trim() || !password) {
+      Alert.alert('입력 필요', '이메일과 비밀번호를 입력해 주세요.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      if (isLogin) {
+        const result = await backendApi.loginEmail({ email: email.trim(), password });
+        let roles = result.user?.roles ?? [];
+        if (roles.length === 0) {
+          const profile = await backendApi.getMe();
+          roles = profile.roles ?? [];
+        }
+        moveAfterLogin(roles);
+      } else {
+        await backendApi.registerEmail({ email: email.trim(), password, displayName: displayName.trim() });
+        Alert.alert('회원가입 완료', '가입되었습니다. 주최자 신청은 다음 화면에서 진행할 수 있습니다.', [
+          { text: '확인', onPress: () => navigation.replace(initialRole === 'ORGANIZER' ? 'Organizer' : 'Main') },
+        ]);
+      }
+    } catch (error: any) {
+      Alert.alert('인증 실패', error.message || '요청을 처리하지 못했습니다.');
+    } finally {
+      setLoading(false);
     }
   };
 
+  const handleWalletAuth = () => {
+    Alert.alert('준비 중', '지갑 인증은 모바일 브라우저 또는 전용 지갑 연동 단계에서 연결할 예정입니다.');
+  };
+
   return (
-    <KeyboardAvoidingView 
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}
-    >
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
+        <Text style={styles.eyebrow}>{targetLabel} 시작</Text>
         <Text style={styles.title}>{isLogin ? '로그인' : '회원가입'}</Text>
-        
+
         <View style={styles.tabContainer}>
-          <TouchableOpacity 
-            style={[styles.tab, isLogin && styles.activeTab]} 
-            onPress={() => setIsLogin(true)}
-          >
+          <TouchableOpacity style={[styles.tab, isLogin && styles.activeTab]} onPress={() => setIsLogin(true)}>
             <Text style={[styles.tabText, isLogin && styles.activeTabText]}>로그인</Text>
           </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.tab, !isLogin && styles.activeTab]} 
-            onPress={() => setIsLogin(false)}
-          >
+          <TouchableOpacity style={[styles.tab, !isLogin && styles.activeTab]} onPress={() => setIsLogin(false)}>
             <Text style={[styles.tabText, !isLogin && styles.activeTabText]}>회원가입</Text>
           </TouchableOpacity>
         </View>
 
         <View style={styles.form}>
-          {!isLogin && (
+          {!isLogin ? (
             <TextInput
               style={styles.input}
-              placeholder="이름 (Display Name)"
+              placeholder="이름"
               value={displayName}
               onChangeText={setDisplayName}
             />
-          )}
+          ) : null}
           <TextInput
             style={styles.input}
             placeholder="이메일"
@@ -110,10 +108,14 @@ export default function AuthPage({ navigation, route }: any) {
             onChangeText={setPassword}
             secureTextEntry
           />
-          
-          <TouchableOpacity style={styles.primaryButton} onPress={handleEmailAuth}>
+
+          <TouchableOpacity
+            style={[styles.primaryButton, loading && styles.disabledButton]}
+            disabled={loading}
+            onPress={handleEmailAuth}
+          >
             <Text style={styles.primaryButtonText}>
-              {isLogin ? '이메일로 로그인' : '이메일로 시작하기'}
+              {loading ? '처리 중...' : isLogin ? '이메일로 로그인' : '이메일로 시작하기'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -125,15 +127,12 @@ export default function AuthPage({ navigation, route }: any) {
         </View>
 
         <TouchableOpacity style={styles.walletButton} onPress={handleWalletAuth}>
-          <Text style={styles.walletButtonText}>지갑(Wallet)으로 계속하기</Text>
+          <Text style={styles.walletButtonText}>지갑으로 계속하기</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity 
-          style={styles.switchButton} 
-          onPress={() => setIsLogin(!isLogin)}
-        >
+        <TouchableOpacity style={styles.switchButton} onPress={() => setIsLogin((value) => !value)}>
           <Text style={styles.switchButtonText}>
-            {isLogin ? '계정이 없으신가요? 회원가입' : '이미 계정이 있으신가요? 로그인'}
+            {isLogin ? '계정이 없나요? 회원가입' : '이미 계정이 있나요? 로그인'}
           </Text>
         </TouchableOpacity>
       </ScrollView>
@@ -142,102 +141,25 @@ export default function AuthPage({ navigation, route }: any) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
-  scrollContent: {
-    padding: 30,
-    paddingTop: 60,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    marginBottom: 30,
-    textAlign: 'center',
-  },
-  tabContainer: {
-    flexDirection: 'row',
-    marginBottom: 30,
-    backgroundColor: '#F2F2F7',
-    borderRadius: 8,
-    padding: 4,
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: 10,
-    alignItems: 'center',
-    borderRadius: 6,
-  },
-  activeTab: {
-    backgroundColor: '#fff',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-  },
-  tabText: {
-    fontSize: 16,
-    color: '#8E8E93',
-    fontWeight: '600',
-  },
-  activeTabText: {
-    color: '#007AFF',
-  },
-  form: {
-    gap: 15,
-  },
-  input: {
-    backgroundColor: '#F2F2F7',
-    padding: 15,
-    borderRadius: 10,
-    fontSize: 16,
-  },
-  primaryButton: {
-    backgroundColor: '#007AFF',
-    padding: 18,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginTop: 10,
-  },
-  primaryButtonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  dividerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 30,
-  },
-  divider: {
-    flex: 1,
-    height: 1,
-    backgroundColor: '#D1D1D6',
-  },
-  dividerText: {
-    paddingHorizontal: 15,
-    color: '#8E8E93',
-  },
-  walletButton: {
-    borderWidth: 1,
-    borderColor: '#007AFF',
-    padding: 18,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  walletButtonText: {
-    color: '#007AFF',
-    fontSize: 17,
-    fontWeight: '600',
-  },
-  switchButton: {
-    marginTop: 30,
-    alignItems: 'center',
-  },
-  switchButtonText: {
-    color: '#8E8E93',
-    fontSize: 14,
-  },
+  container: { flex: 1, backgroundColor: '#FFFFFF' },
+  scrollContent: { padding: 30, paddingTop: 60 },
+  eyebrow: { color: '#2563EB', fontWeight: '800', textAlign: 'center', marginBottom: 8 },
+  title: { fontSize: 30, fontWeight: '900', marginBottom: 28, textAlign: 'center', color: '#0F172A' },
+  tabContainer: { flexDirection: 'row', marginBottom: 26, backgroundColor: '#F1F5F9', borderRadius: 12, padding: 4 },
+  tab: { flex: 1, paddingVertical: 11, alignItems: 'center', borderRadius: 9 },
+  activeTab: { backgroundColor: '#FFFFFF' },
+  tabText: { fontSize: 16, color: '#64748B', fontWeight: '800' },
+  activeTabText: { color: '#2563EB' },
+  form: { gap: 12 },
+  input: { backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#CBD5E1', padding: 15, borderRadius: 12, fontSize: 16 },
+  primaryButton: { backgroundColor: '#2563EB', padding: 17, borderRadius: 14, alignItems: 'center', marginTop: 6 },
+  primaryButtonText: { color: '#FFFFFF', fontSize: 17, fontWeight: '900' },
+  disabledButton: { opacity: 0.55 },
+  dividerContainer: { flexDirection: 'row', alignItems: 'center', marginVertical: 28 },
+  divider: { flex: 1, height: 1, backgroundColor: '#E2E8F0' },
+  dividerText: { paddingHorizontal: 15, color: '#94A3B8', fontWeight: '700' },
+  walletButton: { borderWidth: 1, borderColor: '#2563EB', padding: 17, borderRadius: 14, alignItems: 'center' },
+  walletButtonText: { color: '#2563EB', fontSize: 16, fontWeight: '900' },
+  switchButton: { marginTop: 28, alignItems: 'center' },
+  switchButtonText: { color: '#64748B', fontSize: 14, fontWeight: '700' },
 });

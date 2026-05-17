@@ -50,7 +50,7 @@ export default function UserHomePage({ navigation }: any) {
         <Text style={styles.cardTitle} numberOfLines={1}>{item.title}</Text>
         <Text style={styles.cardVenue}>{item.venue}</Text>
         <Text style={styles.cardDate}>
-          {new Date(item.eventDateTime).toLocaleDateString()}
+          {new Date(item.eventAt || item.eventDateTime || '').toLocaleDateString()}
         </Text>
       </View>
     </TouchableOpacity>
@@ -155,7 +155,7 @@ const styles = StyleSheet.create({
   selectedCategoryLabel: { color: '#007AFF', fontWeight: 'bold' },
   list: { padding: 15 },
   listHeader: { fontSize: 18, fontWeight: 'bold', marginBottom: 15 },
-  card: { flexDirection: 'row', backgroundColor: '#fff', borderRadius: 12, marginBottom: 15, overflow: 'hidden', borderWeight: 1, borderColor: '#eee', borderWidth: 1 },
+  card: { flexDirection: 'row', backgroundColor: '#fff', borderRadius: 12, marginBottom: 15, overflow: 'hidden', borderColor: '#eee', borderWidth: 1 },
   cardImagePlaceholder: { width: 100, height: 100, backgroundColor: '#eee', justifyContent: 'center', alignItems: 'center' },
   cardContent: { flex: 1, padding: 12 },
   cardCategory: { fontSize: 10, color: '#007AFF', fontWeight: 'bold', marginBottom: 4 },

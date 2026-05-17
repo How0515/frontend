@@ -30,7 +30,7 @@ export default function TicketDetailPage({ route, navigation }: any) {
   };
 
   const handleResale = () => {
-    navigation.navigate('TicketResaleCreate', { ticketId: ticket?.id });
+    navigation.navigate('TicketResaleCreate', { ticketId: ticket?.id ?? ticket?.ticketId });
   };
 
   if (loading) {
@@ -53,9 +53,9 @@ export default function TicketDetailPage({ route, navigation }: any) {
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {/* Event Header */}
       <View style={styles.headerCard}>
-        <Text style={styles.eventTitle}>{ticket.eventTitle}</Text>
-        <Text style={styles.venueText}>{ticket.venue}</Text>
-        <Text style={styles.dateText}>{new Date(ticket.eventDateTime).toLocaleString()}</Text>
+        <Text style={styles.eventTitle}>{ticket.eventTitle ?? ticket.eventName}</Text>
+        <Text style={styles.venueText}>{ticket.venue ?? '-'}</Text>
+        <Text style={styles.dateText}>{ticket.eventDateTime ? new Date(ticket.eventDateTime).toLocaleString() : '-'}</Text>
       </View>
 
       {/* Ticket Details */}
@@ -83,11 +83,13 @@ export default function TicketDetailPage({ route, navigation }: any) {
         <View style={styles.infoRow}>
           <View style={styles.infoBox}>
             <Text style={styles.infoLabel}>구매 가격</Text>
-            <Text style={styles.infoValue}>{ticket.priceWei} WEI</Text>
+            <Text style={styles.infoValue}>{ticket.priceWei ? `${ticket.priceWei} WEI` : '-'}</Text>
           </View>
           <View style={styles.infoBox}>
             <Text style={styles.infoLabel}>소유자</Text>
-            <Text style={styles.infoValue} numberOfLines={1}>{ticket.ownerAddress.slice(0, 6)}...{ticket.ownerAddress.slice(-4)}</Text>
+            <Text style={styles.infoValue} numberOfLines={1}>
+              {ticket.ownerAddress ? `${ticket.ownerAddress.slice(0, 6)}...${ticket.ownerAddress.slice(-4)}` : '-'}
+            </Text>
           </View>
         </View>
       </View>

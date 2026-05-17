@@ -37,7 +37,7 @@ export default function EventDetailPage({ route, navigation }: any) {
         },
         {
           text: 'Purchase',
-          onPress: async (ticketId) => {
+          onPress: async (ticketId?: string) => {
             if (!ticketId) return;
             try {
               await backendApi.purchasePrimary(ticketId);
@@ -71,10 +71,10 @@ export default function EventDetailPage({ route, navigation }: any) {
   return (
     <ScrollView style={styles.container}>
       <View style={styles.content}>
-        <Text style={styles.title}>{event.title}</Text>
+        <Text style={styles.title}>{event.name || event.title}</Text>
         <Text style={styles.venue}>{event.venue}</Text>
         <Text style={styles.date}>
-          {new Date(event.eventDateTime).toLocaleString()}
+          {new Date(event.eventAt || event.eventDateTime || '').toLocaleString()}
         </Text>
         <Text style={styles.description}>{event.description}</Text>
         
