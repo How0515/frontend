@@ -50,8 +50,9 @@ function normalizeStatus(status?: string) {
 }
 
 function buildLoadError(cause: unknown) {
-  if (getHttpStatus(cause) === 403) {
-    return "관리자 권한이 없는 계정입니다. 사용자 목록은 ADMIN 역할이 포함된 토큰으로만 조회할 수 있습니다.";
+  const status = getHttpStatus(cause);
+  if (status === 401 || status === 403) {
+    return "관리자 로그인이 필요합니다. 관리자 계정으로 다시 로그인하세요.";
   }
 
   if (cause instanceof Error) {
@@ -79,7 +80,7 @@ export function AdminUserManagePage() {
       if (!me.roles?.includes("ADMIN")) {
         setItems([]);
         setHasLoaded(false);
-        setError("현재 로그인한 계정에 ADMIN 역할이 없습니다. 관리자 계정으로 다시 로그인하세요.");
+        setError("관리자 로그인이 필요합니다. 관리자 계정으로 다시 로그인하세요.");
         return;
       }
 

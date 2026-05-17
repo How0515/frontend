@@ -21,8 +21,9 @@ function getHttpStatus(cause: unknown) {
 }
 
 function buildError(cause: unknown) {
-  if (getHttpStatus(cause) === 403) {
-    return "관리자 권한이 필요합니다. ADMIN 역할이 포함된 계정으로 다시 로그인하세요.";
+  const status = getHttpStatus(cause);
+  if (status === 401 || status === 403) {
+    return "관리자 로그인이 필요합니다. 관리자 계정으로 다시 로그인하세요.";
   }
   if (cause instanceof Error) {
     return cause.message;
@@ -55,7 +56,7 @@ export function AdminEventsPage() {
       if (!me.roles?.includes("ADMIN")) {
         setItems([]);
         setHasLoaded(false);
-        setError("이벤트 감독은 관리자 로그인이 필요합니다. 관리자 계정으로 다시 로그인하세요.");
+        setError("관리자 로그인이 필요합니다. 관리자 계정으로 다시 로그인하세요.");
         return;
       }
 
