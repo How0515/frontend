@@ -44,6 +44,13 @@ export type AuthTokens = {
   user?: UserProfile;
 };
 
+export type WalletNonce = {
+  walletAddress: string;
+  nonce: string;
+  message: string;
+  expiresAt: string;
+};
+
 export type EventSummary = {
   id: string;
   organizerId?: string;

@@ -27,6 +27,7 @@ export default function EventSettingsPage({ route }: any) {
   const [maxResaleRate, setMaxResaleRate] = useState('120');
   const [resaleStart, setResaleStart] = useState('');
   const [resaleEnd, setResaleEnd] = useState('');
+  const [status, setStatus] = useState('ACTIVE');
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -45,6 +46,7 @@ export default function EventSettingsPage({ route }: any) {
       setMaxResaleRate(String((detail.maxResalePriceRate ?? 12000) / 100));
       setResaleStart((detail.resaleStart || '').slice(0, 16));
       setResaleEnd((detail.resaleEnd || '').slice(0, 16));
+      setStatus(detail.status || 'ACTIVE');
     } catch (error: any) {
       Alert.alert('이벤트 정보 로드 실패', errorMessage(error, '이벤트 정보를 불러오지 못했습니다.'));
     } finally {
@@ -110,6 +112,25 @@ export default function EventSettingsPage({ route }: any) {
     }
   };
 
+  const saveStatus = async (nextStatus: string) => {
+    if (!event) return;
+    setSaving(true);
+    setFeedback(null);
+    try {
+      await backendApi.updateEventStatus(event.id, { status: nextStatus });
+      setStatus(nextStatus);
+      setFeedback('이벤트 상태가 저장되었습니다.');
+      Alert.alert('저장 완료', '이벤트 상태가 저장되었습니다.');
+      await load();
+    } catch (error: any) {
+      const message = errorMessage(error, '이벤트 상태를 변경하지 못했습니다.');
+      setFeedback(message);
+      Alert.alert('상태 변경 실패', message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   if (loading) {
     return <View style={styles.center}><ActivityIndicator size="large" color="#2563EB" /></View>;
   }
@@ -159,6 +180,26 @@ export default function EventSettingsPage({ route }: any) {
           <Text style={styles.secondaryButtonText}>리셀 정책 저장</Text>
         </TouchableOpacity>
       </View>
+
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>이벤트 상태</Text>
+        <View style={styles.statusGrid}>
+          {[
+            { value: 'ACTIVE', label: '활성' },
+            { value: 'INACTIVE', label: '비활성' },
+            { value: 'CANCELED', label: '취소' },
+          ].map((item) => (
+            <TouchableOpacity
+              key={item.value}
+              style={[styles.statusChip, status === item.value && styles.activeStatusChip]}
+              disabled={saving}
+              onPress={() => saveStatus(item.value)}
+            >
+              <Text style={[styles.statusChipText, status === item.value && styles.activeStatusChipText]}>{item.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
     </ScrollView>
   );
 }
@@ -185,6 +226,11 @@ const styles = StyleSheet.create({
   primaryButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '900' },
   secondaryButton: { borderWidth: 1, borderColor: '#CBD5E1', backgroundColor: '#FFFFFF', borderRadius: 14, paddingVertical: 14, alignItems: 'center', marginTop: 14 },
   secondaryButtonText: { color: '#0F172A', fontSize: 16, fontWeight: '900' },
+  statusGrid: { flexDirection: 'row', gap: 8, marginTop: 14 },
+  statusChip: { flex: 1, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 12, paddingVertical: 12, alignItems: 'center', backgroundColor: '#FFFFFF' },
+  activeStatusChip: { borderColor: '#2563EB', backgroundColor: '#EFF6FF' },
+  statusChipText: { color: '#475569', fontWeight: '900' },
+  activeStatusChipText: { color: '#2563EB' },
   toggleRow: { marginTop: 14, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 12, padding: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   toggleLabel: { color: '#0F172A', fontWeight: '800' },
   toggleBadge: { overflow: 'hidden', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4, fontWeight: '900' },

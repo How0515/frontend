@@ -11,6 +11,7 @@ import type {
   TicketDetail,
   UserAdminRecord,
   UserProfile,
+  WalletNonce,
 } from "../types/api";
 import { setAccessToken } from "./auth";
 import { http, unwrap } from "./http";
@@ -26,6 +27,18 @@ export const backendApi = {
 
   async loginEmail(payload: { email: string; password: string }) {
     const data = await unwrap<AuthTokens>(http.post("/auth/email/login", payload));
+    if (data.accessToken) {
+      await setAccessToken(data.accessToken);
+    }
+    return data;
+  },
+
+  async issueWalletNonce(payload: { walletAddress: string }) {
+    return unwrap<WalletNonce>(http.post("/auth/wallet/nonce", payload));
+  },
+
+  async loginWallet(payload: { walletAddress: string; nonce: string; signature: string }) {
+    const data = await unwrap<AuthTokens>(http.post("/auth/wallet/login", payload));
     if (data.accessToken) {
       await setAccessToken(data.accessToken);
     }
