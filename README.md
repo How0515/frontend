@@ -193,24 +193,24 @@ Status meanings:
 | `POST /events/{eventId}/validators` | Exposed only | `CheckInManagePage` | Mobile organizer check-in validator registration is connected. |
 | `GET /events/{eventId}/validators` | Exposed only | `CheckInManagePage` | Mobile organizer validator list is connected. |
 | `POST /events/{eventId}/tickets` | Exposed only | `TicketIssuePage` | Mobile organizer ticket issue flow is connected. |
-| `GET /events/{eventId}/tickets` | Exposed only | event, organizer, sales, check-in pages | Used for primary ticket discovery and organizer dashboards. |
+| `GET /events/{eventId}/tickets` | `EventDetailPage` | event, organizer, sales, check-in pages | Used for primary ticket discovery, ticket selection, and organizer dashboards. |
 | `GET /tickets/me` | `MyPage` | `MyTicketsPage` | User ticket list is connected. |
 | `GET /tickets/{ticketId}` | `TicketDetailPage` | purchase/detail/resale/QR pages | Used appropriately; mobile often fetches event separately for display. |
 | `GET /tickets/{ticketId}/validity` | Exposed only | `TicketDetailPage`, `TicketResaleCreatePage` | Used before detail/resale UI. |
 | `GET /wallets/{walletAddress}/tickets` | Not connected | Not connected | No frontend wrapper or screen uses wallet-based ticket lookup yet. |
-| `POST /tickets/{ticketId}/purchase` | `EventDetailPage` prompt flow | `TicketPurchasePage` | Mobile is structured; web still uses a prompt for ticket ID. |
+| `POST /tickets/{ticketId}/purchase` | `EventDetailPage` ticket selection | `TicketPurchasePage` | Web and mobile now purchase from loaded ticket IDs instead of arbitrary user-entered IDs. |
 
 ### Resale And Check-In
 
 | Backend API | Web | Mobile | Notes |
 | --- | --- | --- | --- |
 | `GET /resale-listings` | `ResaleListPage` | `ResaleListPage`, `EventDetailPage` | Connected. Event detail needs event filtering but backend only supports page/size. |
-| `GET /resale-listings/{listingId}` | Not connected in current web detail | `ResaleDetailPage` | Mobile uses it. Web resale detail currently purchases by route ID without loading detail. |
+| `GET /resale-listings/{listingId}` | `ResaleDetailPage` | `ResaleDetailPage` | Web and mobile load listing details before purchase. |
 | `POST /tickets/{ticketId}/resale-listing` | `TicketDetailPage` | `TicketResaleCreatePage` | Connected. Mobile reuses completion page. |
 | `POST /resale-listings/{listingId}/purchase` | `ResaleDetailPage` | `ResaleDetailPage` | Connected. |
 | `PATCH /resale-listings/{listingId}/cancel` | Exposed only | Exposed only | No UI currently cancels a resale listing. |
-| `POST /tickets/{ticketId}/qr` | Exposed only | `TicketQrPage` | Mobile uses a placeholder signature. Needs wallet signing. |
-| `GET /tickets/{ticketId}/check-in-message` | Exposed only | Exposed only | Not used by mobile QR generation yet. Should feed wallet signing. |
+| `POST /tickets/{ticketId}/qr` | Exposed only | `TicketQrPage` | Mobile calls it after fetching the check-in message hash, but still uses a development signature placeholder. |
+| `GET /tickets/{ticketId}/check-in-message` | Exposed only | `TicketQrPage` | Mobile now fetches the message hash before QR creation. Real wallet signing is still TODO. |
 | `POST /check-ins` | Exposed only | `CheckInManagePage` | Mobile organizer check-in processing is connected. |
 | `GET /tickets/{ticketId}/check-ins` | Exposed only | `CheckInStatusPage` | Mobile organizer check-in history is connected. |
 | `POST /disputes` | Not connected | Not connected | No frontend dispute creation flow yet. |
@@ -239,22 +239,21 @@ Connected:
 - Main/event list/search/category: `GET /events` is used with `query` and `category`.
 - Event detail: `GET /events/{eventId}` and `GET /events/{eventId}/tickets` are used.
 - Primary purchase: `POST /tickets/{ticketId}/purchase` is used by `TicketPurchasePage`.
+- Web event detail also uses `GET /events/{eventId}/tickets` and purchases from a selected loaded ticket instead of prompting for a raw ticket ID.
 - Purchase complete: reuses returned ticket/listing IDs and routes to ticket detail or ticket list.
 - Resale list/detail/purchase: `GET /resale-listings`, `GET /resale-listings/{listingId}`, and `POST /resale-listings/{listingId}/purchase` are used.
 - My page/ticket list/ticket detail: `GET /users/me`, `GET /tickets/me`, `GET /tickets/{ticketId}`, and `GET /tickets/{ticketId}/validity` are used.
 - Ticket resale registration: `POST /tickets/{ticketId}/resale-listing` is used, then `ResaleRegisterCompletePage` is reused.
+- QR generation now calls `GET /tickets/{ticketId}/check-in-message` before `POST /tickets/{ticketId}/qr`, so the QR request is based on the backend-provided message hash path.
 
 Temporary or incomplete:
 
 - Event-specific resale list: mobile filters `GET /resale-listings` client-side by `eventId`. Backend does not currently accept `eventId` for that endpoint.
-- QR generation: `TicketQrPage` calls `POST /tickets/{ticketId}/qr` with `signature: "mobile-dev-signature"`. This is a placeholder and not a real wallet signature.
+- QR signing: `TicketQrPage` still uses `signature: "mobile-dev-signature"` after fetching the message hash. This placeholder is isolated in `createDevelopmentSignature` and must be replaced by a real wallet signature.
 - Wallet login: mobile uses backend wallet nonce/login endpoints, but the user manually enters wallet address and signature. There is no mobile wallet connector/deep-link flow.
-- Web user primary purchase still prompts for a ticket ID instead of showing a ticket selection UI.
-- Web resale detail does not currently load `GET /resale-listings/{listingId}` before purchase.
 
 Not connected from the user plan:
 
-- `GET /tickets/{ticketId}/check-in-message` is not used by `TicketQrPage`; it should be part of the real wallet-signing QR flow.
 - `GET /wallets/{walletAddress}/tickets` has no frontend usage.
 - User dispute creation/history APIs are not wired.
 
@@ -282,7 +281,7 @@ Wallet auth and signatures:
 
 - Mobile wallet login uses `POST /auth/wallet/nonce` and `POST /auth/wallet/login`, but address/signature input is manual.
 - Web wallet login is not connected.
-- QR generation needs a real signature over the check-in payload. Mobile currently has a TODO and sends a development placeholder signature.
+- QR generation first asks the backend for the check-in message hash, then calls QR creation. Mobile still has a TODO and sends a development placeholder signature instead of a real wallet signature.
 - `CheckInManagePage` can parse a QR payload and send `POST /check-ins`; this is the validator-side processing path, not the owner-side signing path.
 
 ## Remaining TODO
@@ -291,7 +290,7 @@ Wallet auth and signatures:
 - Replace mobile QR placeholder signature with a real wallet signature flow.
 - Add mobile wallet connection/deep-link support for nonce login and QR signing.
 - Decide how email-only users should generate QR codes if they do not have a wallet address/signature.
-- Wire `GET /tickets/{ticketId}/check-in-message` into QR signing flow.
+- Use the `GET /tickets/{ticketId}/check-in-message` hash as the actual input to wallet signing once a wallet connector exists.
 - Decide whether direct frontend blockchain utilities should be used in UI or removed in favor of backend-mediated blockchain only.
 - Keep admin blockchain transaction log as the canonical frontend view for backend-recorded on-chain/simulated actions, and consider adding transaction detail links if real explorers are configured.
 - Add user dispute creation and user dispute history pages if dispute APIs are part of the user scope.

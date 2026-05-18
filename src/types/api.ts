@@ -53,13 +53,19 @@ export type AdminDashboardSummary = {
 
 export type EventSummary = {
   id: string;
-  title: string;
+  title?: string;
+  name?: string;
   description?: string;
   venue: string;
-  eventDateTime: string;
+  eventDateTime?: string;
+  eventAt?: string;
+  ticketPriceWei?: string;
   status: string;
   category?: string;
   soldOut?: boolean;
+  totalTicketCount?: number;
+  soldTicketCount?: number;
+  remainingTicketCount?: number;
 };
 
 export type EventDetail = EventSummary & {
@@ -80,11 +86,21 @@ export type EventDetail = EventSummary & {
 };
 
 export type TicketDetail = {
-  ticketId: number;
+  id?: string;
+  ticketId: number | string;
   eventId: string;
-  eventName: string;
+  eventName?: string;
+  eventTitle?: string;
   seatInfo: string;
   status: string;
+  priceWei?: string;
+  originalPriceWei?: string;
+  ownerAddress?: string;
+  ownerWalletAddress?: string;
+  contractTokenId?: string;
+  usedAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
   qrImageUrl?: string;
 };
 
@@ -144,14 +160,21 @@ export type CheckInRecord = {
 };
 
 export type ResaleListing = {
-  listingId: string;
-  ticketId: number;
+  id?: string;
+  listingId?: string;
+  ticketId: number | string;
   eventId: string;
-  eventName: string;
-  seatInfo: string;
-  price: string;
+  eventName?: string;
+  seatInfo?: string;
+  price?: string;
+  priceWei?: string;
   sellerDisplayName?: string;
+  sellerId?: string;
+  buyerId?: string;
   status: string;
+  purchasedAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
 };
 
 export type ResaleTransactionRecord = {

@@ -96,7 +96,7 @@ export const backendApi = {
     return unwrap<TicketDetail>(http.post(`/tickets/${ticketId}/purchase`));
   },
 
-  async getResaleListings(params?: { eventId?: string }) {
+  async getResaleListings(params?: { page?: number; size?: number }) {
     return unwrap<PageResult<ResaleListing>>(http.get("/resale-listings", { params }));
   },
 

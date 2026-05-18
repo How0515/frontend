@@ -8,7 +8,13 @@ export default function TicketQrPage({ route }: any) {
   const { ticketId } = route.params;
   const [ticket, setTicket] = useState<TicketDetail | null>(null);
   const [qr, setQr] = useState<TicketQr | null>(null);
+  const [messageHash, setMessageHash] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const createDevelopmentSignature = (_hash?: string) => {
+    // TODO: Replace this with a real mobile wallet signature over the check-in message hash.
+    return 'mobile-dev-signature';
+  };
 
   const loadQr = async () => {
     setLoading(true);
@@ -17,8 +23,13 @@ export default function TicketQrPage({ route }: any) {
       setTicket(ticketData);
       const claimedOwner = ticketData.ownerWalletAddress || ticketData.ownerAddress || 'mobile-user';
       const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString();
-      // TODO: Replace the development signature placeholder with a wallet signature flow.
-      setQr(await backendApi.createTicketQr(String(ticketId), { claimedOwner, expiresAt, signature: 'mobile-dev-signature' }));
+
+      const checkInMessage = await backendApi.getTicketCheckInMessage(String(ticketId), { claimedOwner, expiresAt });
+      const hash = String(checkInMessage.messageHash ?? '');
+      setMessageHash(hash);
+
+      const signature = createDevelopmentSignature(hash);
+      setQr(await backendApi.createTicketQr(String(ticketId), { claimedOwner, expiresAt, signature }));
     } catch (error: any) {
       Alert.alert('QR 생성 실패', error.message || 'QR을 생성하지 못했습니다.');
     } finally {
@@ -47,6 +58,7 @@ export default function TicketQrPage({ route }: any) {
       <View style={styles.card}>
         <Text style={styles.label}>바코드</Text>
         <Text style={styles.barcode}>{qr?.barcodeText || String(ticketId)}</Text>
+        <Text style={styles.expires}>서명 대상: {messageHash ? `${messageHash.slice(0, 12)}...` : '-'}</Text>
         <Text style={styles.expires}>만료: {qr?.expiresAt ? new Date(qr.expiresAt).toLocaleString() : '-'}</Text>
       </View>
       <TouchableOpacity style={styles.button} onPress={loadQr}>

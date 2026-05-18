@@ -33,9 +33,9 @@ export function UserHomePage() {
       <div className="card-grid">
         {events.map((event) => (
           <Link key={event.id} className="event-card" to={`/app/events/${event.id}`}>
-            <h3>{event.title}</h3>
+            <h3>{event.name || event.title || "이벤트"}</h3>
             <p>{event.venue}</p>
-            <p>{new Date(event.eventDateTime).toLocaleString()}</p>
+            <p>{event.eventAt || event.eventDateTime ? new Date(event.eventAt || event.eventDateTime || "").toLocaleString() : "-"}</p>
             <p>{event.status}</p>
           </Link>
         ))}
