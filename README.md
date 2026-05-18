@@ -137,6 +137,43 @@ Mobile:
 | `GET /admin/resale-transactions` | `AdminDisputeTransactionPage` |
 | `GET /admin/blockchain-transactions` | `AdminBlockchainLogPage` |
 
+## Admin Feature Semantics
+
+The current admin web UI is wired to the backend policies below. Use this section as the demo script source of truth.
+
+### Event Supervision
+
+- `PATCH /admin/events/{eventId}/flag` and `/unflag` only toggle `EventEntity.flagged`.
+- The flag does not change `EventStatus`, ticket purchase availability, resale availability, or check-in availability.
+- UI wording uses "검토 표시" to distinguish it from cancellation.
+- Admin cancellation uses `PATCH /events/{eventId}/status` with `CANCELED`.
+- The same status API is also exposed to organizers in the mobile app (`EventSettingsPage`) and currently allows `ACTIVE`, `INACTIVE`, and `CANCELED`.
+- Backend policy today does not make admin cancellation irreversible. Demo wording should treat cancellation as a dangerous operational action, while README/TODO tracks the policy mismatch.
+
+### User Management And Validators
+
+- `PATCH /users/{userId}/validator` grants the global `VALIDATOR` role.
+- Backend check-in authorization allows `ADMIN`, global `VALIDATOR`, or an event-specific validator record from `event_validators`.
+- If the user has a wallet address, granting global validator also records an `addValidator` blockchain action.
+- UI wording uses "입장/체크인 검증자" because this role is for ticket check-in validation, not organizer approval or event review.
+- Mobile organizers can separately register event-specific validators through `POST /events/{eventId}/validators`.
+
+### Disputes And Resale Transactions
+
+- The backend has user-facing dispute APIs: `POST /disputes` and `GET /disputes/me`.
+- A dispute can be created with either `resaleListingId` or `ticketId`, plus `type` and `description`.
+- The admin web only reviews existing disputes through `GET /admin/disputes` and `PATCH /admin/disputes/{disputeId}/review`.
+- Current mobile screens import dispute types and admin wrappers, but there is no user-visible dispute-report screen or button wired to `POST /disputes`.
+- Resale transaction monitoring reads `GET /admin/resale-transactions`; by default the backend returns non-active resale listings unless a status filter is supplied.
+
+### Blockchain Logs
+
+- Admin blockchain logs read backend-recorded submissions from `GET /admin/blockchain-transactions`.
+- `SIMULATED` means `app.blockchain.enabled=false` or missing real chain mode, so `NoopTrustTicketGateway` recorded a fake transaction hash instead of submitting on-chain.
+- `SUBMITTED` means `Web3jTrustTicketGateway` submitted a transaction and received a transaction hash. The current backend does not track confirmations, receipts, or finality.
+- `FAILED` exists in the enum, but current gateway failures throw before `BlockchainTransactionService.record(...)`, so failed attempts may not appear unless future code records them explicitly.
+- Recorded action names can include `addOrganizer`, `addValidator`, `addEventValidator`, `createEvent`, `setEventStatus`, `mintTicket`, `purchaseTicket`, `listTicket`, `purchaseResaleTicket`, `cancelListing`, and `useTicket`.
+
 ## Blockchain And Wallet Notes
 
 - The admin web console displays backend-recorded blockchain transactions through `GET /admin/blockchain-transactions`.
@@ -146,6 +183,12 @@ Mobile:
 
 ## Remaining Frontend TODO
 
+- Decide and enforce event cancellation policy:
+  - Option A: admin cancellation is irreversible and organizer reactivation is blocked after `CANCELED`.
+  - Option B: status recovery is allowed, and admin UI should expose/describe recovery consistently.
+- Add a mobile user dispute-report flow wired to `POST /disputes`, plus a "my disputes" screen wired to `GET /disputes/me`.
+- Decide whether failed blockchain submissions should be recorded as `FAILED`; current Web3j errors throw before a log row is persisted.
+- Add admin filtering for 검토 표시 events using the existing `GET /admin/events?flagged=true` backend parameter if demo needs a dedicated review queue.
 - Decide whether `src/lib/blockchain/client.ts` should remain as future admin tooling or be removed if backend-mediated blockchain is the only supported web path.
 - Keep `src/lib/backend.ts` broad for now; prune only after confirming no admin page or future admin task depends on the method.
 - Add admin explorer links for real blockchain transactions once network/explorer config exists.

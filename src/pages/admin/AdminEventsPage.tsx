@@ -11,7 +11,7 @@ const STATUS_LABEL: Record<string, string> = {
   ACTIVE: "진행중",
   INACTIVE: "비활성",
   CANCELED: "취소됨",
-  FLAGGED: "플래그",
+  FLAGGED: "검토 표시",
 };
 
 function getHttpStatus(cause: unknown) {
@@ -117,7 +117,9 @@ export function AdminEventsPage() {
   }, [items, query]);
 
   async function handleFlag(eventId: string, currentlyFlagged: boolean) {
-    const message = currentlyFlagged ? "이벤트 플래그를 해제하시겠습니까?" : "이 이벤트에 플래그를 설정하시겠습니까?";
+    const message = currentlyFlagged
+      ? "이벤트 검토 표시를 해제하시겠습니까? 이벤트 상태와 판매 가능 여부는 변경되지 않습니다."
+      : "이 이벤트를 검토 대상으로 표시하시겠습니까? 취소와 달리 이벤트 상태와 판매 가능 여부는 변경되지 않습니다.";
     if (!window.confirm(message)) {
       return;
     }
@@ -127,10 +129,10 @@ export function AdminEventsPage() {
     try {
       if (currentlyFlagged) {
         await backendApi.unflagAdminEvent(eventId);
-        setActionMessage("이벤트 플래그를 해제했습니다.");
+        setActionMessage("이벤트 검토 표시를 해제했습니다.");
       } else {
         await backendApi.flagAdminEvent(eventId);
-        setActionMessage("이벤트에 플래그를 설정했습니다.");
+        setActionMessage("이벤트를 검토 대상으로 표시했습니다.");
       }
       await load();
     } catch (cause) {
@@ -142,7 +144,7 @@ export function AdminEventsPage() {
   }
 
   async function handleCancel(eventId: string) {
-    if (!window.confirm("이 이벤트를 취소 처리하시겠습니까? 취소된 이벤트는 목록에 남고 상태가 CANCELED로 변경됩니다.")) {
+    if (!window.confirm("이 이벤트를 취소 처리하시겠습니까? 현재 API상 주최자/관리자가 같은 상태 변경 API를 사용하므로 재활성화가 가능하지만, 관리자 시연에서는 복구 전 별도 정책 확인이 필요한 위험 작업으로 안내합니다.")) {
       return;
     }
 
@@ -192,6 +194,8 @@ export function AdminEventsPage() {
         .ae-toast { background: #e8f5e9; border: 1px solid #a5d6a7; color: #2e7d32; border-radius: 10px; padding: 0.65rem 1rem; font-size: 0.88rem; font-weight: 700; margin-top: 0.75rem; }
         .ae-error { background: #fff5f5; border: 1px solid #ffcdd2; color: #c62828; border-radius: 10px; padding: 0.75rem 1rem; font-size: 0.88rem; font-weight: 700; margin-top: 0.75rem; display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; }
         .ae-error .button { border-color: #ffcdd2; background: #fff; color: #c62828; padding: 0.35rem 0.65rem; }
+        .ae-note { margin-top: 0.8rem; border: 1px solid #dbeafe; background: #f8fbff; color: var(--txt-sub); border-radius: 12px; padding: 0.72rem 0.9rem; font-size: 0.84rem; line-height: 1.55; }
+        .ae-note strong { color: var(--txt-main); }
         .ae-shell { background: var(--panel); border: 1px solid var(--border); border-radius: 20px; box-shadow: var(--shadow); overflow: hidden; }
         .ae-table-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1rem 1.25rem; border-bottom: 1px solid var(--border); background: linear-gradient(180deg, #fff, #f7f9fc); }
         .ae-table-head h3 { margin: 0; font-size: 0.95rem; font-weight: 800; }
@@ -230,6 +234,10 @@ export function AdminEventsPage() {
               <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="이벤트명 또는 주최자 검색" />
               <button type="submit">검색</button>
             </form>
+          </div>
+
+          <div className="ae-note">
+            <strong>검토 표시</strong>는 운영자가 나중에 확인할 이벤트를 표시하는 메모성 플래그입니다. <strong>취소</strong>는 이벤트 상태를 CANCELED로 바꾸며 티켓 구매/리셀/체크인을 막는 위험 작업입니다.
           </div>
 
           <div className="ae-tabs">
@@ -318,7 +326,7 @@ export function AdminEventsPage() {
                                   onClick={() => void handleFlag(event.id, true)}
                                   type="button"
                                 >
-                                  {flaggingId === event.id ? "처리중..." : "플래그 해제"}
+                                  {flaggingId === event.id ? "처리중..." : "검토 표시 해제"}
                                 </button>
                               ) : (
                                 <button
@@ -327,7 +335,7 @@ export function AdminEventsPage() {
                                   onClick={() => void handleFlag(event.id, false)}
                                   type="button"
                                 >
-                                  {flaggingId === event.id ? "처리중..." : "플래그"}
+                                  {flaggingId === event.id ? "처리중..." : "검토 표시"}
                                 </button>
                               )}
                               <button

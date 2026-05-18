@@ -6,9 +6,23 @@ import type { BlockchainTransactionRecord } from "../../types/api";
 type StatusFilter = "ALL" | "SIMULATED" | "SUBMITTED" | "FAILED";
 
 const STATUS_LABEL: Record<string, string> = {
-  SIMULATED: "시뮬레이션",
-  SUBMITTED: "제출됨",
+  SIMULATED: "시뮬레이션 기록",
+  SUBMITTED: "체인 제출됨",
   FAILED: "실패",
+};
+
+const ACTION_LABEL: Record<string, string> = {
+  addOrganizer: "주최자 온체인 등록",
+  addValidator: "전역 체크인 검증자 등록",
+  addEventValidator: "이벤트 체크인 검증자 등록",
+  createEvent: "이벤트 생성",
+  setEventStatus: "이벤트 활성 상태 변경",
+  mintTicket: "티켓 발행",
+  purchaseTicket: "1차 티켓 구매",
+  listTicket: "리셀 등록",
+  purchaseResaleTicket: "리셀 구매",
+  cancelListing: "리셀 등록 취소",
+  useTicket: "입장 처리",
 };
 
 function getHttpStatus(cause: unknown) {
@@ -120,8 +134,8 @@ export function AdminBlockchainLogPage() {
 
   const filterTabs: { label: string; value: StatusFilter }[] = [
     { label: "전체", value: "ALL" },
-    { label: "시뮬레이션", value: "SIMULATED" },
-    { label: "제출됨", value: "SUBMITTED" },
+    { label: "시뮬레이션 기록", value: "SIMULATED" },
+    { label: "체인 제출됨", value: "SUBMITTED" },
     { label: "실패", value: "FAILED" },
   ];
 
@@ -138,6 +152,9 @@ export function AdminBlockchainLogPage() {
         .bc-metric strong { display: block; margin-top: 0.25rem; font-size: 1.25rem; }
         .bc-error { background: #fff5f5; border: 1px solid #ffcdd2; color: #c62828; border-radius: 12px; padding: 0.75rem 1rem; font-weight: 800; display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
         .bc-error .button { border-color: #ffcdd2; background: #fff; color: #c62828; padding: 0.35rem 0.65rem; }
+        .bc-note { border: 1px solid #dbeafe; background: #f8fbff; color: var(--txt-sub); border-radius: 12px; padding: 0.72rem 0.9rem; font-size: 0.84rem; line-height: 1.55; }
+        .bc-note strong { color: var(--txt-main); }
+        .bc-note code { color: var(--txt-main); font-weight: 800; }
         .bc-shell { background: var(--panel); border: 1px solid var(--border); border-radius: 20px; box-shadow: var(--shadow); overflow: hidden; }
         .bc-toolbar { padding: 1rem 1.1rem; border-bottom: 1px solid var(--border); background: linear-gradient(180deg, #fff, #f7f9fc); display: flex; justify-content: space-between; gap: 0.8rem; align-items: center; flex-wrap: wrap; }
         .bc-toolbar h3 { margin: 0; font-size: 1rem; }
@@ -173,11 +190,11 @@ export function AdminBlockchainLogPage() {
           </div>
           <div className="bc-metrics">
             <article className="bc-metric">
-              <span>시뮬레이션</span>
+              <span>시뮬레이션 기록</span>
               <strong>{simulatedCount}</strong>
             </article>
             <article className="bc-metric">
-              <span>제출됨</span>
+              <span>체인 제출됨</span>
               <strong>{submittedCount}</strong>
             </article>
             <article className="bc-metric">
@@ -186,6 +203,11 @@ export function AdminBlockchainLogPage() {
             </article>
           </div>
         </header>
+
+        <div className="bc-note">
+          <strong>SIMULATED</strong>는 백엔드가 블록체인 비활성 모드에서 실제 전송 대신 기록한 상태입니다. <strong>SUBMITTED</strong>는 Web3j 게이트웨이가 컨트랙트 트랜잭션을 제출하고 해시를 받은 상태이며, 현재 화면은 컨펌 수까지 추적하지 않습니다.
+          기록 액션은 <code>createEvent</code>, <code>mintTicket</code>, <code>purchaseTicket</code>, <code>listTicket</code>, <code>purchaseResaleTicket</code>, <code>cancelListing</code>, <code>useTicket</code>, 검증자/주최자 등록 계열입니다.
+        </div>
 
         {error ? (
           <div className="bc-error">
@@ -249,7 +271,7 @@ export function AdminBlockchainLogPage() {
                     return (
                       <tr key={item.id ?? `${item.action}-${item.createdAt}`}>
                         <td className="bc-mono">#{shortText(item.id, 8)}</td>
-                        <td className="bc-action">{item.action ?? "-"}</td>
+                        <td className="bc-action">{item.action ? ACTION_LABEL[item.action] ?? item.action : "-"}</td>
                         <td className="bc-mono" title={txHash}>{shortText(txHash, 18)}</td>
                         <td className="bc-mono" title={item.contractAddress}>{shortText(item.contractAddress, 14)}</td>
                         <td>

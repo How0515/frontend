@@ -15,7 +15,7 @@ const ROLE_LABEL: Record<string, string> = {
   USER: "사용자",
   ADMIN: "관리자",
   ORGANIZER: "주최자",
-  VALIDATOR: "검증자",
+  VALIDATOR: "입장/체크인 검증자",
 };
 
 type UserStatusFilter = "ALL" | "ACTIVE" | "SUSPENDED" | "DELETED";
@@ -136,7 +136,7 @@ export function AdminUserManagePage() {
       suspend: "이 사용자를 정지하시겠습니까?",
       activate: "이 사용자를 활성화하시겠습니까?",
       delete: "이 사용자를 삭제 처리하시겠습니까?",
-      validator: "이 사용자에게 검증자 권한을 부여하시겠습니까?",
+      validator: "이 사용자에게 전체 이벤트 체크인 검증 권한을 부여하시겠습니까? 지갑 주소가 있으면 블록체인 addValidator 기록도 생성됩니다.",
     };
 
     if (!window.confirm(confirmMessages[action])) {
@@ -160,7 +160,7 @@ export function AdminUserManagePage() {
       }
       if (action === "validator") {
         await backendApi.grantValidator(userId);
-        setActionMessage("검증자 권한을 부여했습니다.");
+        setActionMessage("입장/체크인 검증자 권한을 부여했습니다.");
       }
       await load();
     } catch (cause) {
@@ -203,6 +203,8 @@ export function AdminUserManagePage() {
         .user-toast { background: #e8f5e9; border: 1px solid #a5d6a7; color: #2e7d32; border-radius: 10px; padding: 0.6rem 1rem; font-size: 0.88rem; font-weight: 600; margin-top: 0.75rem; }
         .user-error { background: #fff5f5; border: 1px solid #ffcdd2; color: #c62828; border-radius: 10px; padding: 0.75rem 1rem; font-size: 0.88rem; font-weight: 600; margin-top: 0.75rem; display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; }
         .user-error .button { border-color: #ffcdd2; background: #fff; color: #c62828; padding: 0.35rem 0.65rem; }
+        .user-note { margin-top: 0.8rem; border: 1px solid #dbeafe; background: #f8fbff; color: var(--txt-sub); border-radius: 12px; padding: 0.72rem 0.9rem; font-size: 0.84rem; line-height: 1.55; }
+        .user-note strong { color: var(--txt-main); }
         .user-table-shell { background: var(--panel); border: 1px solid var(--border); border-radius: 20px; box-shadow: var(--shadow); overflow: hidden; }
         .user-table-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1rem 1.25rem; border-bottom: 1px solid var(--border); background: linear-gradient(180deg, #fff, #f7f9fc); }
         .user-table-head h3 { margin: 0; font-size: 0.95rem; font-weight: 700; }
@@ -252,6 +254,10 @@ export function AdminUserManagePage() {
                 검색
               </button>
             </form>
+          </div>
+
+          <div className="user-note">
+            <strong>입장/체크인 검증자</strong>는 특정 이벤트 검증자 등록 없이도 체크인 검증을 수행할 수 있는 전역 역할입니다. 주최자는 모바일 앱에서 이벤트별 검증자를 별도로 등록할 수 있습니다.
           </div>
 
           <div className="user-filter-tabs">
@@ -376,7 +382,7 @@ export function AdminUserManagePage() {
                                 onClick={() => void runAction(user.id, "validator")}
                                 type="button"
                               >
-                                검증자
+                                체크인 검증자
                               </button>
                               <button
                                 className="user-action-btn danger"
