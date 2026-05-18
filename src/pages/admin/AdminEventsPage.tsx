@@ -148,7 +148,7 @@ export function AdminEventsPage() {
   }
 
   async function handleCancel(eventId: string) {
-    if (!window.confirm("이 이벤트를 취소 처리하시겠습니까? 현재 API상 주최자/관리자가 같은 상태 변경 API를 사용하므로 재활성화가 가능하지만, 관리자 시연에서는 복구 전 별도 정책 확인이 필요한 위험 작업으로 안내합니다.")) {
+    if (!window.confirm("이 이벤트를 관리자 취소 처리하시겠습니까? 티켓 구매, 리셀, 체크인이 중단되며 관리자만 복구할 수 있습니다.")) {
       return;
     }
 
@@ -167,7 +167,7 @@ export function AdminEventsPage() {
   }
 
   async function handleRestore(eventId: string) {
-    if (!window.confirm("취소된 이벤트를 다시 활성화하시겠습니까? 관리자 복구는 adminCanceled 표시를 해제하고 상태를 ACTIVE로 되돌립니다.")) {
+    if (!window.confirm("취소된 이벤트를 다시 활성화하시겠습니까?")) {
       return;
     }
 
@@ -218,15 +218,17 @@ export function AdminEventsPage() {
         .ae-search { display: flex; gap: 0.5rem; align-items: center; }
         .ae-search input { border-radius: 10px; border: 1px solid var(--border-strong); padding: 0.5rem 0.75rem; font-size: 0.9rem; width: 240px; color: var(--txt-main); background: #fff; }
         .ae-search button { border: 1px solid var(--border); background: var(--panel); color: var(--txt-main); border-radius: 10px; padding: 0.5rem 0.85rem; cursor: pointer; font-size: 0.9rem; font-weight: 700; }
-        .ae-filter-row { display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; margin-top: 1rem; }
+        .ae-filter-row { display: flex; gap: 0.65rem; align-items: end; flex-wrap: wrap; margin-top: 0.8rem; }
+        .ae-filter-group { display: grid; gap: 0.28rem; }
         .ae-filter-label { color: var(--txt-sub); font-size: 0.78rem; font-weight: 800; }
+        .ae-select { min-width: 150px; border: 1px solid var(--border-strong); border-radius: 10px; padding: 0.46rem 0.7rem; background: #fff; color: var(--txt-main); font-size: 0.84rem; font-weight: 700; }
         .ae-tabs { display: flex; gap: 0.4rem; flex-wrap: wrap; }
         .ae-tab { border: 1px solid var(--border); background: var(--panel-soft); color: var(--txt-sub); border-radius: 999px; padding: 0.38rem 0.9rem; font-size: 0.83rem; font-weight: 700; cursor: pointer; }
         .ae-tab.active { background: #e8f1ff; border-color: #cfe0ff; color: var(--accent-2); }
         .ae-toast { background: #e8f5e9; border: 1px solid #a5d6a7; color: #2e7d32; border-radius: 10px; padding: 0.65rem 1rem; font-size: 0.88rem; font-weight: 700; margin-top: 0.75rem; }
         .ae-error { background: #fff5f5; border: 1px solid #ffcdd2; color: #c62828; border-radius: 10px; padding: 0.75rem 1rem; font-size: 0.88rem; font-weight: 700; margin-top: 0.75rem; display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; }
         .ae-error .button { border-color: #ffcdd2; background: #fff; color: #c62828; padding: 0.35rem 0.65rem; }
-        .ae-note { margin-top: 0.8rem; border: 1px solid #dbeafe; background: #f8fbff; color: var(--txt-sub); border-radius: 12px; padding: 0.72rem 0.9rem; font-size: 0.84rem; line-height: 1.55; }
+        .ae-note { margin-top: 0.7rem; border: 1px solid #dbeafe; background: #f8fbff; color: var(--txt-sub); border-radius: 10px; padding: 0.55rem 0.75rem; font-size: 0.8rem; line-height: 1.45; }
         .ae-note strong { color: var(--txt-main); }
         .ae-shell { background: var(--panel); border: 1px solid var(--border); border-radius: 20px; box-shadow: var(--shadow); overflow: hidden; }
         .ae-table-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1rem 1.25rem; border-bottom: 1px solid var(--border); background: linear-gradient(180deg, #fff, #f7f9fc); }
@@ -263,7 +265,7 @@ export function AdminEventsPage() {
             <div className="ae-title">
               <p className="eyebrow">이벤트 관리</p>
               <h2>이벤트 감독</h2>
-              <p className="desc">이벤트 상태를 확인하고 검토 표시, 관리자 취소, 관리자 복구를 처리합니다.</p>
+              <p className="desc">이벤트 상태와 검토 대상을 관리합니다.</p>
             </div>
             <form className="ae-search" onSubmit={handleSearch}>
               <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="이벤트명 또는 주최자 검색" />
@@ -272,41 +274,45 @@ export function AdminEventsPage() {
           </div>
 
           <div className="ae-note">
-            <strong>검토 표시</strong>는 운영자가 나중에 확인할 이벤트를 표시하는 메모성 플래그입니다. <strong>취소</strong>는 이벤트 상태를 CANCELED로 바꾸며 티켓 구매/리셀/체크인을 막는 위험 작업입니다.
+            검토 표시는 관리자 확인이 필요한 이벤트를 표시하는 기능이며, 이벤트 상태나 판매에는 영향을 주지 않습니다.
           </div>
 
           <div className="ae-filter-row">
-            <span className="ae-filter-label">상태</span>
-            <div className="ae-tabs">
-              {filterTabs.map((tab) => (
-                <button
-                  key={tab.value}
-                  className={`ae-tab${filterStatus === tab.value ? " active" : ""}`}
-                  onClick={() => {
-                    setPage(0);
-                    setFilterStatus(tab.value);
-                  }}
-                  type="button"
-                >
-                  {tab.label}
-                </button>
-              ))}
+            <div className="ae-filter-group">
+              <label className="ae-filter-label" htmlFor="event-status-filter">이벤트 상태</label>
+              <select
+                className="ae-select"
+                id="event-status-filter"
+                value={filterStatus}
+                onChange={(event) => {
+                  setPage(0);
+                  setFilterStatus(event.target.value as FilterStatus);
+                }}
+              >
+                {filterTabs.map((tab) => (
+                  <option key={tab.value} value={tab.value}>
+                    {tab.label}
+                  </option>
+                ))}
+              </select>
             </div>
-            <span className="ae-filter-label">검토 표시</span>
-            <div className="ae-tabs">
-              {flaggedTabs.map((tab) => (
-                <button
-                  key={tab.value}
-                  className={`ae-tab${flaggedFilter === tab.value ? " active" : ""}`}
-                  onClick={() => {
-                    setPage(0);
-                    setFlaggedFilter(tab.value);
-                  }}
-                  type="button"
-                >
-                  {tab.label}
-                </button>
-              ))}
+            <div className="ae-filter-group">
+              <label className="ae-filter-label" htmlFor="event-flag-filter">검토 상태</label>
+              <select
+                className="ae-select"
+                id="event-flag-filter"
+                value={flaggedFilter}
+                onChange={(event) => {
+                  setPage(0);
+                  setFlaggedFilter(event.target.value as FlaggedFilter);
+                }}
+              >
+                {flaggedTabs.map((tab) => (
+                  <option key={tab.value} value={tab.value}>
+                    {tab.label}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 

@@ -10,10 +10,19 @@ const adminLinks = [
   { to: "/admin/blockchain", label: "블록체인 로그" },
 ];
 
+const adminPageTitles = [
+  { path: "/admin/organizer-approvals", title: "주최자 승인" },
+  { path: "/admin/events", title: "이벤트 감독" },
+  { path: "/admin/users", title: "사용자 관리" },
+  { path: "/admin/disputes", title: "분쟁/거래 센터" },
+  { path: "/admin/blockchain", title: "블록체인 로그" },
+];
+
 export function Layout() {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const isAdminRoute = pathname.startsWith("/admin");
+  const adminTitle = adminPageTitles.find((item) => pathname.startsWith(item.path))?.title ?? "관리자 대시보드";
 
   function handleLogout() {
     clearAccessToken();
@@ -46,7 +55,7 @@ export function Layout() {
           <header className="admin-topbar">
             <div>
               <p className="eyebrow">관리자 웹 포털</p>
-              <h1>관리자 대시보드</h1>
+              <h1>{adminTitle}</h1>
             </div>
             <button className="button" onClick={handleLogout} type="button">
               로그아웃

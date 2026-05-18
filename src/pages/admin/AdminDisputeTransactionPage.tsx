@@ -250,8 +250,6 @@ export function AdminDisputeTransactionPage() {
         .dt-alert { background: #fff5f5; border: 1px solid #ffcdd2; color: #c62828; border-radius: 12px; padding: 0.75rem 1rem; font-weight: 700; display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; }
         .dt-alert .button { border-color: #ffcdd2; background: #fff; color: #c62828; padding: 0.35rem 0.65rem; }
         .dt-toast { background: #e8f5e9; border: 1px solid #a5d6a7; color: #2e7d32; border-radius: 12px; padding: 0.75rem 1rem; font-weight: 700; }
-        .dt-note { border: 1px solid #dbeafe; background: #f8fbff; color: var(--txt-sub); border-radius: 12px; padding: 0.72rem 0.9rem; font-size: 0.84rem; line-height: 1.55; }
-        .dt-note strong { color: var(--txt-main); }
         .dt-workspace { display: grid; grid-template-columns: minmax(360px, 0.95fr) minmax(420px, 1.15fr); gap: 1rem; align-items: start; }
         .dt-panel { background: var(--panel); border: 1px solid var(--border); border-radius: 20px; box-shadow: var(--shadow); overflow: hidden; }
         .dt-panel-head { padding: 1rem 1.1rem; border-bottom: 1px solid var(--border); background: linear-gradient(180deg, #fff, #f7f9fc); display: flex; justify-content: space-between; gap: 0.8rem; align-items: center; flex-wrap: wrap; }
@@ -301,7 +299,7 @@ export function AdminDisputeTransactionPage() {
           <div className="dt-title">
             <p className="eyebrow">분쟁/거래 센터</p>
             <h2>리셀 거래와 분쟁 처리</h2>
-            <p className="desc">접수된 사용자 분쟁을 검토하고 완료/취소된 리셀 거래 내역을 모니터링합니다.</p>
+            <p className="desc">사용자가 접수한 분쟁을 검토하고, 리셀 거래 내역을 모니터링합니다.</p>
           </div>
           <div className="dt-metrics">
             <article className="dt-metric">
@@ -328,9 +326,6 @@ export function AdminDisputeTransactionPage() {
           </div>
         ) : null}
         {message ? <div className="dt-toast">{message}</div> : null}
-        <div className="dt-note">
-          <strong>분쟁 데이터</strong>는 백엔드의 <code>POST /disputes</code>로 생성되고 관리자 화면은 <code>GET /admin/disputes</code>로 조회합니다. 현재 모바일 사용자 화면에는 분쟁 신고 진입점이 없어 API 연결 TODO가 남아 있습니다.
-        </div>
 
         <div className="dt-workspace">
           <section className="dt-panel">
@@ -356,7 +351,7 @@ export function AdminDisputeTransactionPage() {
               {loading ? (
                 <div className="dt-empty">불러오는 중...</div>
               ) : disputes.length === 0 ? (
-                <div className="dt-empty">조건에 맞는 분쟁이 없습니다.</div>
+                <div className="dt-empty">현재 처리할 분쟁이 없습니다.</div>
               ) : (
                 disputes.map((item) => {
                   const status = item.status ?? "OPEN";

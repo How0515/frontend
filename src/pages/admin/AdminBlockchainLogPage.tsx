@@ -153,9 +153,10 @@ export function AdminBlockchainLogPage() {
         .bc-metric strong { display: block; margin-top: 0.25rem; font-size: 1.25rem; }
         .bc-error { background: #fff5f5; border: 1px solid #ffcdd2; color: #c62828; border-radius: 12px; padding: 0.75rem 1rem; font-weight: 800; display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
         .bc-error .button { border-color: #ffcdd2; background: #fff; color: #c62828; padding: 0.35rem 0.65rem; }
-        .bc-note { border: 1px solid #dbeafe; background: #f8fbff; color: var(--txt-sub); border-radius: 12px; padding: 0.72rem 0.9rem; font-size: 0.84rem; line-height: 1.55; }
-        .bc-note strong { color: var(--txt-main); }
-        .bc-note code { color: var(--txt-main); font-weight: 800; }
+        .bc-legend { border: 1px solid #dbeafe; background: #f8fbff; color: var(--txt-sub); border-radius: 10px; padding: 0.55rem 0.75rem; font-size: 0.8rem; line-height: 1.45; }
+        .bc-legend summary { cursor: pointer; color: var(--txt-main); font-weight: 800; }
+        .bc-legend div { margin-top: 0.45rem; display: flex; gap: 0.7rem; flex-wrap: wrap; }
+        .bc-legend strong { color: var(--txt-main); }
         .bc-shell { background: var(--panel); border: 1px solid var(--border); border-radius: 20px; box-shadow: var(--shadow); overflow: hidden; }
         .bc-toolbar { padding: 1rem 1.1rem; border-bottom: 1px solid var(--border); background: linear-gradient(180deg, #fff, #f7f9fc); display: flex; justify-content: space-between; gap: 0.8rem; align-items: center; flex-wrap: wrap; }
         .bc-toolbar h3 { margin: 0; font-size: 1rem; }
@@ -188,7 +189,7 @@ export function AdminBlockchainLogPage() {
           <div className="bc-title">
             <p className="eyebrow">블록체인 로그</p>
             <h2>트랜잭션 모니터링</h2>
-            <p className="desc">백엔드가 기록한 온체인 제출 또는 시뮬레이션 액션을 최근 순서로 확인합니다.</p>
+            <p className="desc">백엔드가 기록한 온체인 제출 또는 시뮬레이션 액션을 확인합니다.</p>
           </div>
           <div className="bc-metrics">
             <article className="bc-metric">
@@ -206,10 +207,14 @@ export function AdminBlockchainLogPage() {
           </div>
         </header>
 
-        <div className="bc-note">
-          <strong>SIMULATED</strong>는 백엔드가 블록체인 비활성 모드에서 실제 전송 대신 기록한 상태입니다. <strong>SUBMITTED</strong>는 Web3j 게이트웨이가 컨트랙트 트랜잭션을 제출하고 해시를 받은 상태이며, 현재 화면은 컨펌 수까지 추적하지 않습니다.
-          기록 액션은 <code>createEvent</code>, <code>mintTicket</code>, <code>purchaseTicket</code>, <code>listTicket</code>, <code>purchaseResaleTicket</code>, <code>cancelListing</code>, <code>useTicket</code>, 검증자/주최자 등록 계열입니다.
-        </div>
+        <details className="bc-legend">
+          <summary>상태 도움말</summary>
+          <div>
+            <span><strong>SIMULATED</strong>: 실제 전송 없이 기록</span>
+            <span><strong>SUBMITTED</strong>: 체인 제출 및 해시 수신</span>
+            <span><strong>FAILED</strong>: 제출 또는 기록 실패</span>
+          </div>
+        </details>
 
         {error ? (
           <div className="bc-error">

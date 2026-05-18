@@ -134,10 +134,10 @@ export function AdminDashboardPage() {
     <>
       <style>{`
         .dash-page { display: grid; gap: 0.8rem; }
-        .dash-hero { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 0.85rem 1rem; box-shadow: var(--shadow); }
+        .dash-hero { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 0.65rem 0.85rem; box-shadow: var(--shadow); }
         .dash-title .eyebrow { margin: 0; }
-        .dash-title h2 { margin: 0.08rem 0 0; font-size: 1.18rem; }
-        .dash-title p { margin: 0.28rem 0 0; color: var(--txt-sub); font-size: 0.86rem; line-height: 1.45; }
+        .dash-title h2 { margin: 0.04rem 0 0; font-size: 1.08rem; }
+        .dash-title p { margin: 0.2rem 0 0; color: var(--txt-sub); font-size: 0.84rem; line-height: 1.35; max-width: 620px; }
         .dash-alert { background: #fff5f5; border: 1px solid #ffcdd2; color: #c62828; border-radius: 12px; padding: 0.75rem 1rem; font-weight: 800; display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
         .dash-alert .button { border-color: #ffcdd2; background: #fff; color: #c62828; padding: 0.35rem 0.65rem; }
         .dash-block { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow); overflow: hidden; }
@@ -169,10 +169,7 @@ export function AdminDashboardPage() {
           <div className="dash-title">
             <p className="eyebrow">관리자 콘솔</p>
             <h2>관리자 대시보드</h2>
-            <p>
-              플랫폼 운영 현황을 한눈에 확인하고, 승인·감독·분쟁·블록체인 로그를 관리합니다. 현재 운영 중인 이벤트,
-              티켓 판매, 체크인, 리셀 상태를 기준으로 플랫폼 상태를 확인합니다.
-            </p>
+            <p>플랫폼 운영 현황과 검토가 필요한 항목을 확인합니다.</p>
           </div>
         </header>
 
