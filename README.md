@@ -1,139 +1,236 @@
 # Trust Ticket Frontend
 
-블록체인 기반 티켓 관리 시스템의 프론트엔드 애플리케이션입니다. React와 TypeScript를 기반으로 하며, 관리자, 주최자, 사용자 역할별 기능을 제공합니다.
+Trust Ticket has two separate frontend surfaces:
 
-## 📋 주요 기능
+- `frontend/`: admin-only web console built with Vite, React, and TypeScript.
+- `frontend/mobile/`: user, organizer, and validator mobile app built with Expo and React Native.
 
-### 랜딩 페이지
-- 서비스 소개 및 진입점
-- 사용자 인증 연결
+The web app no longer contains user or organizer web routes. Ticket purchase, resale, ticket QR, organizer event operation, and check-in flows belong to the mobile app.
 
-### 로그인 페이지
-- 사용자 인증
-- 역할 기반 리다이렉트
+## Project Overview
 
-### 관리자 패널
-- **대시보드**: 시스템 전체 현황 모니터링
-- **주최자 승인**: 신규 주최자 신청 심사 및 승인 관리
-- **이벤트 관리**: 전체 이벤트 조회 및 관리
-- **사용자 관리**: 사용자 정보 및 권한 관리
-- **분쟁 거래 관리**: 거래 분쟁 해결 및 추적
-- **블록체인 로그**: 블록체인 거래 기록 조회
+| Area | Path | Purpose |
+| --- | --- | --- |
+| Admin Web Console | `frontend/` | Platform operation, approval, supervision, disputes, users, and blockchain logs |
+| Mobile App | `frontend/mobile/` | User ticket flows, organizer event operation, resale, QR, check-in, and disputes |
+| Backend | `../backend/` | API server, PostgreSQL, blockchain gateway, and admin/mobile API support |
 
-## 🛠 기술 스택
+## Admin Web Console
 
-- **UI Framework**: React 18.3.1
-- **Language**: TypeScript 5.8.3
-- **Build Tool**: Vite 5.4.19
-- **Router**: React Router 6.30.1
-- **HTTP Client**: Axios 1.10.0
-- **Blockchain**: ethers.js 6.14.4
-- **Test Framework**: Vitest 2.1.9 + React Testing Library 16.3.0
+### Active Routes
 
-## 📁 프로젝트 구조
+Routes are defined in `src/routes.tsx`.
 
-```
+| Route | Page |
+| --- | --- |
+| `/` | Admin landing page |
+| `/login` | Admin login |
+| `/admin` | Admin dashboard |
+| `/admin/organizer-approvals` | Organizer approvals |
+| `/admin/events` | Event supervision |
+| `/admin/users` | User management |
+| `/admin/disputes` | Dispute and resale transaction center |
+| `/admin/blockchain` | Blockchain logs |
+
+### Main Screens
+
+- **Dashboard**: Shows key admin work items and operational metrics.
+- **Organizer Approvals**: Reviews organizer applications.
+- **Event Supervision**: Manages event review flags, admin cancellation, and reactivation.
+- **User Management**: Manages user status and grants global validator permission.
+- **Dispute/Transaction Center**: Reviews user disputes and monitors resale transactions.
+- **Blockchain Logs**: Shows submitted or simulated blockchain actions recorded by the backend.
+
+### Admin Web Structure
+
+```text
 frontend/
 ├── src/
-│   ├── components/          # 공유 컴포넌트
-│   │   ├── Layout.tsx       # 레이아웃 wrapper
-│   │   ├── RequireAdmin.tsx # 관리자 권한 보호
-│   │   └── AdminPagination.tsx # 페이지네이션
-│   ├── pages/               # 페이지 컴포넌트
+│   ├── components/
+│   │   ├── Layout.tsx
+│   │   ├── RequireAdmin.tsx
+│   │   └── AdminPagination.tsx
+│   ├── lib/
+│   │   ├── auth.ts
+│   │   ├── authRoute.ts
+│   │   ├── backend.ts
+│   │   ├── config.ts
+│   │   └── http.ts
+│   ├── pages/
 │   │   ├── LandingPage.tsx
 │   │   ├── LoginPage.tsx
-│   │   └── admin/           # 관리자 페이지
+│   │   └── admin/
 │   │       ├── AdminDashboardPage.tsx
 │   │       ├── OrganizerApprovalsPage.tsx
 │   │       ├── AdminEventsPage.tsx
 │   │       ├── AdminUserManagePage.tsx
 │   │       ├── AdminDisputeTransactionPage.tsx
 │   │       └── AdminBlockchainLogPage.tsx
-│   ├── lib/                 # 유틸리티 및 라이브러리
-│   │   ├── auth.ts          # 인증 관련 함수
-│   │   ├── backend.ts       # 백엔드 API 관련
-│   │   ├── config.ts        # 설정
-│   │   └── blockchain/      # 블록체인 관련 함수
-│   ├── types/               # TypeScript 타입 정의
-│   │   └── api.ts           # API 타입
-│   ├── App.tsx              # 메인 앱 컴포넌트
-│   ├── routes.tsx           # 라우팅 설정
-│   └── main.tsx             # 애플리케이션 진입점
-├── test/
-│   └── setup.ts             # 테스트 설정
-├── vite.config.ts           # Vite 설정
-├── vitest.config.ts         # Vitest 설정
-├── tsconfig.json            # TypeScript 설정
-└── package.json
+│   ├── routes.tsx
+│   └── main.tsx
+├── package.json
+└── vite.config.ts
 ```
 
-## 🚀 설치 및 실행
+Admin API calls are centralized in `src/lib/backend.ts`.
 
-### 요구사항
-- Node.js 18.0.0 이상
-- npm 또는 pnpm
+## Mobile App
 
-### 설치
+The mobile app lives under `frontend/mobile/` and uses the navigation stack in `mobile/App.tsx`.
+
+### User Flows
+
+- Authentication: `Landing`, `Auth`
+- Primary ticket purchase: `Main`, `EventList`, `EventDetail`, `TicketPurchase`, `PurchaseComplete`
+- Resale purchase: `ResaleList`, `ResaleDetail`, `PurchaseComplete`
+- My tickets and QR: `MyPage`, `MyTickets`, `TicketDetail`, `TicketQr`
+- Resale registration: `TicketResaleCreate`, `ResaleRegisterComplete`
+- Disputes: `DisputeCreate`, `MyDisputes`
+
+### Organizer and Validator Flows
+
+- Organizer home: `Organizer`
+- Event operation: `EventCreate`, `MyEvents`, `OrganizerEventDetail`
+- Ticket issuance: `TicketIssue`
+- Operational status: `SalesStatus`, `CheckInStatus`
+- Settings and check-in: `EventSettings`, `CheckInManage`, `CheckInScan`
+- Account: `OrganizerProfile`, `OrganizerLogout`
+
+Mobile API calls are centralized in `frontend/mobile/src/lib/backend.ts`.
+
+## Tech Stack
+
+### Admin Web
+
+- React 18
+- TypeScript
+- Vite
+- React Router
+- Axios
+- Vitest and React Testing Library
+
+### Mobile
+
+- Expo
+- React Native
+- React Navigation
+- Axios
+- expo-secure-store
+- expo-camera
+- react-native-qrcode-svg
+
+## Running Locally
+
+The backend requires PostgreSQL first. The Docker Compose file is in `backend/docker-compose.yml`.
+
+```bash
+cd ../backend
+docker compose up -d
+./gradlew bootRun
+```
+
+Reset local development data:
+
+```bash
+cd ../backend
+docker compose down -v
+docker compose up -d
+```
+
+Run the admin web console:
+
 ```bash
 cd frontend
 npm install
-# 또는
-pnpm install
-```
-
-### 개발 서버 실행
-```bash
 npm run dev
-# 또는
-pnpm dev
 ```
-브라우저에서 `http://localhost:5173`로 접속합니다.
 
-### 프로덕션 빌드
+Run the mobile app on web:
+
+```bash
+cd frontend/mobile
+npm install
+npm run web
+```
+
+## Environment Variables
+
+Admin web uses `frontend/.env`.
+
+```text
+VITE_API_BASE_URL=/api/v1
+VITE_BACKEND_ORIGIN=http://localhost:8080
+VITE_CHAIN_RPC_URL=http://127.0.0.1:8545
+VITE_CHAIN_ID=31337
+VITE_TRUST_TICKET_CONTRACT_ADDRESS=
+```
+
+Mobile uses `frontend/mobile/.env`.
+
+```text
+EXPO_PUBLIC_API_BASE_URL=http://localhost:8080/api/v1
+EXPO_PUBLIC_CHAIN_RPC_URL=http://localhost:8545
+EXPO_PUBLIC_CHAIN_ID=31337
+EXPO_PUBLIC_TRUST_TICKET_CONTRACT_ADDRESS=
+```
+
+## Current Policies
+
+### Event Review and Cancellation
+
+| Item | Behavior |
+| --- | --- |
+| Review | Admin-only marker for events that need another look. It does not affect sales or check-in. |
+| Organizer cancellation | The organizer can reactivate the event. |
+| Admin cancellation | The organizer cannot reactivate the event. Only an admin can reactivate it. |
+
+Admin cancellation is distinguished by the backend `adminCanceled` field.
+
+### Validators
+
+| Type | Behavior |
+| --- | --- |
+| Global validator | Can process QR check-ins for all events. |
+| Event validator | Can process QR check-ins only for a specific event. |
+
+The admin web currently grants global validator permission. Global validator removal is not implemented yet.
+
+### Disputes
+
+- Users create disputes in the mobile app.
+- Admins review disputes in the admin web.
+- Resale transaction monitoring is part of the admin dispute/transaction center.
+
+### Blockchain Logs
+
+| Status | Meaning |
+| --- | --- |
+| `SIMULATED` | Recorded without sending an actual chain transaction. |
+| `SUBMITTED` | Chain transaction was submitted and a transaction hash was received. |
+| `FAILED` | Submission or logging failed. |
+
+The current admin UI does not track confirmations, receipts, or finality.
+
+## Verification
+
+Admin web:
+
 ```bash
 npm run build
-# 또는
-pnpm build
+npm test
 ```
 
-### 빌드 결과 미리보기
+Mobile:
+
 ```bash
-npm run preview
-# 또는
-pnpm preview
+cd mobile
+npx tsc --noEmit
 ```
 
-### 테스트 실행
-```bash
-# 단일 실행
-npm run test
+## Remaining Work
 
-# Watch 모드
-npm run test:watch
-```
-
-## 🔐 보안 기능
-
-- **역할 기반 접근 제어 (RBAC)**: `RequireAdmin` 컴포넌트를 통한 관리자 페이지 보호
-- **토큰 기반 인증**: JWT 토큰을 이용한 사용자 인증
-- **블록체인 통합**: ethers.js를 통한 안전한 거래 처리
-
-## 📱 반응형 디자인
-
-Layout 컴포넌트를 통해 모든 페이지에서 일관된 반응형 UI를 제공합니다.
-
-## 🔗 API 연동
-
-Axios를 통해 백엔드 API와 통신하며, `lib/backend.ts`에서 API 엔드포인트를 관리합니다.
-
-## 📦 모바일 앱
-
-`frontend/mobile/` 디렉토리에 React Native 기반의 모바일 애플리케이션이 별도로 구성되어 있습니다.
-
-## 🤝 기여
-
-이 프로젝트는 BlockChain Ticket 프로젝트의 일부입니다. 기여하려면 기본 개발 가이드라인을 따라주세요.
-
-## 📝 라이선스
-
-BlockChain Ticket 프로젝트와 같은 라이선스를 따릅니다.
+- Decide whether to add global validator removal.
+- Decide whether every blockchain submission failure should be persisted as `FAILED`.
+- Add explorer links when a real blockchain network is configured.
+- Replace demo-oriented QR signing with real mobile wallet signing.
+- Decide whether reviewed events need a dedicated queue beyond the current filter.
