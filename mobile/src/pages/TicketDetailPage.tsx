@@ -29,7 +29,7 @@ export default function TicketDetailPage({ route, navigation }: any) {
   if (loading) return <View style={styles.center}><ActivityIndicator size="large" color="#007AFF" /></View>;
   if (!ticket) return <View style={styles.center}><Text>티켓 정보를 찾을 수 없습니다.</Text></View>;
 
-  const canResale = ['OWNED', 'PURCHASED'].includes(String(ticket.status));
+  const canResale = String(ticket.status) === 'SOLD';
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
