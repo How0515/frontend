@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   ScrollView,
   StyleSheet,
@@ -18,6 +19,12 @@ type EthereumProvider = {
 };
 
 type WalletStep = 'idle' | 'connecting' | 'signing' | 'signed';
+
+const METAMASK_MOBILE_LINK = 'https://metamask.app.link/';
+const NATIVE_WALLET_UNAVAILABLE_MESSAGE =
+  'Expo Go에서는 브라우저 지갑(window.ethereum)이 없어 MetaMask 연결/서명 팝업을 받을 수 없습니다. 모바일 지갑 인증은 MetaMask Connect 또는 WalletConnect가 포함된 개발 빌드/EAS에서 테스트해 주세요. MetaMask 앱이 설치되어 있지 않다면 먼저 설치해 주세요.';
+const NATIVE_WALLET_HELP =
+  '모바일 앱에서는 MetaMask 앱과 연결해야 합니다. Expo Go는 지갑 승인 후 앱으로 돌아오는 연결 세션을 처리할 수 없어 개발 빌드가 필요합니다.';
 
 function getEthereumProvider() {
   if (Platform.OS !== 'web') return null;
@@ -44,6 +51,25 @@ function walletClientMessage(error: any, fallback: string) {
     return '지갑 요청이 거절되었습니다. 연결 또는 서명을 승인해야 계속할 수 있습니다.';
   }
   return typeof error?.message === 'string' && error.message.trim() ? error.message : fallback;
+}
+
+function showWalletAlert(title: string, message: string) {
+  if (Platform.OS === 'web') {
+    Alert.alert(title, message);
+    return;
+  }
+
+  Alert.alert(title, message, [
+    { text: '닫기', style: 'cancel' },
+    {
+      text: 'MetaMask 열기',
+      onPress: () => {
+        void Linking.openURL(METAMASK_MOBILE_LINK).catch(() => {
+          Alert.alert('MetaMask 실행 실패', 'MetaMask 앱을 설치한 뒤 다시 시도해 주세요.');
+        });
+      },
+    },
+  ]);
 }
 
 export default function AuthPage({ navigation, route }: any) {
@@ -113,6 +139,10 @@ export default function AuthPage({ navigation, route }: any) {
   };
 
   const connectInjectedWallet = async () => {
+    if (Platform.OS !== 'web') {
+      throw new Error(NATIVE_WALLET_UNAVAILABLE_MESSAGE);
+    }
+
     const provider = getEthereumProvider();
     if (!provider) {
       throw new Error('브라우저 지갑을 찾을 수 없습니다. MetaMask 등 Web3 지갑을 설치하거나 지갑 내 브라우저에서 접속해 주세요.');
@@ -175,8 +205,9 @@ export default function AuthPage({ navigation, route }: any) {
       const message = error?.response
         ? errorMessage(error, '지갑 로그인에 실패했습니다.')
         : walletClientMessage(error, '지갑 인증에 실패했습니다.');
+      setWalletStep('idle');
       setFeedback({ type: 'error', message });
-      Alert.alert(isLogin ? '지갑 로그인 실패' : '지갑 회원가입 실패', message);
+      showWalletAlert(isLogin ? '지갑 로그인 실패' : '지갑 회원가입 실패', message);
     } finally {
       setLoading(false);
     }
@@ -225,6 +256,9 @@ export default function AuthPage({ navigation, route }: any) {
                   {walletAddress || '아직 연결된 지갑이 없습니다.'}
                 </Text>
               </View>
+              {Platform.OS !== 'web' ? (
+                <Text style={styles.nativeWalletHelp}>{NATIVE_WALLET_HELP}</Text>
+              ) : null}
               {walletMessage ? (
                 <View style={styles.walletMessageBox}>
                   <Text style={styles.walletMessageLabel}>서명 요청 메시지</Text>
@@ -322,6 +356,7 @@ const styles = StyleSheet.create({
   successText: { color: '#047857' },
   input: { backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#CBD5E1', padding: 15, borderRadius: 12, fontSize: 16 },
   walletSignupHelp: { color: '#64748B', fontSize: 13, fontWeight: '700', lineHeight: 19 },
+  nativeWalletHelp: { color: '#64748B', fontSize: 12, fontWeight: '700', lineHeight: 18 },
   connectedWalletBox: { backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 12, padding: 12 },
   connectedWalletLabel: { color: '#2563EB', fontSize: 12, fontWeight: '900', marginBottom: 6 },
   connectedWalletAddress: { color: '#0F172A', fontSize: 14, fontWeight: '800' },
