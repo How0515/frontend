@@ -153,9 +153,10 @@ export function AdminBlockchainLogPage() {
         .bc-metric strong { display: block; margin-top: 0.25rem; font-size: 1.25rem; }
         .bc-error { background: #fff5f5; border: 1px solid #ffcdd2; color: #c62828; border-radius: 12px; padding: 0.75rem 1rem; font-weight: 800; display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
         .bc-error .button { border-color: #ffcdd2; background: #fff; color: #c62828; padding: 0.35rem 0.65rem; }
-        .bc-legend { border: 1px solid #dbeafe; background: #f8fbff; color: var(--txt-sub); border-radius: 10px; padding: 0.55rem 0.75rem; font-size: 0.8rem; line-height: 1.45; }
+        .bc-legend { border: 1px solid #bfdbfe; background: #f8fbff; color: var(--txt-sub); border-radius: 16px; padding: 0.85rem 1rem; font-size: 0.84rem; line-height: 1.5; box-shadow: var(--shadow); }
         .bc-legend summary { cursor: pointer; color: var(--txt-main); font-weight: 800; }
-        .bc-legend div { margin-top: 0.45rem; display: flex; gap: 0.7rem; flex-wrap: wrap; }
+        .bc-legend div { margin-top: 0.65rem; display: grid; grid-template-columns: repeat(3, minmax(160px, 1fr)); gap: 0.6rem; }
+        .bc-legend-item { border: 1px solid var(--border); background: #fff; border-radius: 12px; padding: 0.7rem; display: grid; gap: 0.35rem; }
         .bc-legend strong { color: var(--txt-main); }
         .bc-shell { background: var(--panel); border: 1px solid var(--border); border-radius: 20px; box-shadow: var(--shadow); overflow: hidden; }
         .bc-toolbar { padding: 1rem 1.1rem; border-bottom: 1px solid var(--border); background: linear-gradient(180deg, #fff, #f7f9fc); display: flex; justify-content: space-between; gap: 0.8rem; align-items: center; flex-wrap: wrap; }
@@ -210,9 +211,9 @@ export function AdminBlockchainLogPage() {
         <details className="bc-legend">
           <summary>상태 도움말</summary>
           <div>
-            <span><strong>SIMULATED</strong>: 실제 전송 없이 기록</span>
-            <span><strong>SUBMITTED</strong>: 체인 제출 후 해시 수신</span>
-            <span><strong>FAILED</strong>: 제출 또는 기록 실패</span>
+            <span className="bc-legend-item"><span className="bc-badge simulated">시뮬레이션</span><strong>실제 체인 전송 없이 내부 기록만 남긴 상태입니다.</strong></span>
+            <span className="bc-legend-item"><span className="bc-badge submitted">제출 완료</span><strong>체인 제출 후 트랜잭션 해시를 받은 상태입니다.</strong></span>
+            <span className="bc-legend-item"><span className="bc-badge failed">실패</span><strong>체인 제출 또는 기록 처리 중 실패한 상태입니다.</strong></span>
           </div>
         </details>
 

@@ -180,6 +180,18 @@ export const backendApi = {
     return unwrap<UserAdminRecord>(http.patch(`/users/${userId}/validator`));
   },
 
+  async revokeValidator(userId: string) {
+    return unwrap<UserAdminRecord>(http.patch(`/users/${userId}/validator/revoke`));
+  },
+
+  async grantOrganizer(userId: string) {
+    return unwrap<UserAdminRecord>(http.patch(`/users/${userId}/organizer`));
+  },
+
+  async revokeOrganizer(userId: string) {
+    return unwrap<UserAdminRecord>(http.patch(`/users/${userId}/organizer/revoke`));
+  },
+
   async getOrganizerApplications(params?: { status?: string; page?: number; size?: number }) {
     return unwrap<PageResult<OrganizerApplication>>(http.get("/organizer-applications", { params }));
   },

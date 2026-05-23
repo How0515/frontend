@@ -4,7 +4,7 @@ import { AdminPagination } from "../../components/AdminPagination";
 import { backendApi } from "../../lib/backend";
 import type { DisputeRecord, ResaleTransactionRecord } from "../../types/api";
 
-type DisputeStatusFilter = "ALL" | "OPEN" | "REVIEWING" | "RESOLVED" | "REJECTED";
+type DisputeStatusFilter = "ALL" | "OPEN" | "REVIEWING" | "RESOLVED" | "REJECTED" | "CANCELED";
 type ResaleStatusFilter = "ALL" | "ACTIVE" | "SOLD" | "CANCELED";
 type ReviewStatus = "REVIEWING" | "RESOLVED" | "REJECTED";
 const PAGE_SIZE = 20;
@@ -14,6 +14,7 @@ const DISPUTE_STATUS_LABEL: Record<string, string> = {
   REVIEWING: "검토 중",
   RESOLVED: "해결",
   REJECTED: "반려",
+  CANCELED: "취소됨",
 };
 
 const RESALE_STATUS_LABEL: Record<string, string> = {
@@ -226,6 +227,7 @@ export function AdminDisputeTransactionPage() {
     { label: "검토 중", value: "REVIEWING" },
     { label: "해결", value: "RESOLVED" },
     { label: "반려", value: "REJECTED" },
+    { label: "취소됨", value: "CANCELED" },
   ];
 
   const transactionTabs: { label: string; value: ResaleStatusFilter }[] = [

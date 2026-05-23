@@ -51,6 +51,7 @@ export default function OrganizerDashboardPage({ navigation }: any) {
   const [businessName, setBusinessName] = useState('');
   const [contactEmail, setContactEmail] = useState('');
   const [description, setDescription] = useState('');
+  const [feedback, setFeedback] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   const isOrganizer = profile?.roles?.includes('ORGANIZER') || profile?.roles?.includes('ADMIN');
@@ -120,12 +121,21 @@ export default function OrganizerDashboardPage({ navigation }: any) {
   };
 
   const submitApplication = async () => {
-    if (!businessName.trim() || !contactEmail.trim()) {
-      Alert.alert('입력 필요', '상호명과 연락 이메일을 입력해주세요.');
+    if (!businessName.trim()) {
+      const message = '상호명을 입력해주세요.';
+      setFeedback(message);
+      Alert.alert('입력 필요', message);
+      return;
+    }
+    if (!contactEmail.trim()) {
+      const message = '연락 이메일을 입력해주세요.';
+      setFeedback(message);
+      Alert.alert('입력 필요', message);
       return;
     }
 
     setSubmitting(true);
+    setFeedback('');
     try {
       await backendApi.submitOrganizerApplication({
         businessName: businessName.trim(),
@@ -137,7 +147,10 @@ export default function OrganizerDashboardPage({ navigation }: any) {
       Alert.alert('신청 완료', '주최자 승인 신청이 접수되었습니다.');
       await load();
     } catch (error: any) {
-      Alert.alert('신청 실패', error.message || '신청을 처리하지 못했습니다.');
+      const message = errorMessage(error, '주최자 승인 신청에 실패했습니다.');
+      const visibleMessage = message.includes('businessName') || message.includes('상호') ? '상호명을 입력해주세요.' : message;
+      setFeedback(visibleMessage);
+      Alert.alert('신청 실패', visibleMessage);
     } finally {
       setSubmitting(false);
     }
@@ -201,6 +214,11 @@ export default function OrganizerDashboardPage({ navigation }: any) {
                 keyboardType="email-address"
               />
               <TextInput style={[styles.input, styles.textArea]} value={description} onChangeText={setDescription} placeholder="활동 계획 또는 소개" multiline />
+              {feedback ? (
+                <View style={styles.feedbackBox}>
+                  <Text style={styles.feedbackText}>{feedback}</Text>
+                </View>
+              ) : null}
               <TouchableOpacity style={[styles.primaryButton, submitting && styles.disabledButton]} disabled={submitting} onPress={submitApplication}>
                 <Text style={styles.primaryButtonText}>{submitting ? '신청 중...' : '승인 신청하기'}</Text>
               </TouchableOpacity>
@@ -284,6 +302,8 @@ const styles = StyleSheet.create({
   statusMeta: { marginTop: 3, color: '#475569' },
   input: { borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 12, padding: 12, marginTop: 10, backgroundColor: '#FFFFFF', color: '#0F172A' },
   textArea: { minHeight: 96, textAlignVertical: 'top' },
+  feedbackBox: { marginTop: 10, backgroundColor: '#FEF2F2', borderWidth: 1, borderColor: '#FCA5A5', borderRadius: 12, padding: 12 },
+  feedbackText: { color: '#B91C1C', fontWeight: '800', lineHeight: 20 },
   primaryButton: { backgroundColor: '#2563EB', borderRadius: 14, paddingVertical: 14, alignItems: 'center', marginTop: 12 },
   primaryButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '900' },
   secondaryButton: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 14, paddingVertical: 14, alignItems: 'center', marginTop: 10 },

@@ -33,8 +33,8 @@ function buildLoginError(cause: unknown) {
 
 export function LoginPage() {
   const navigate = useNavigate();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [email, setEmail] = useState(import.meta.env.DEV ? "admin@example.com" : "");
+  const [password, setPassword] = useState(import.meta.env.DEV ? "admin1234" : "");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 

@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { errorMessage } from '../lib/account';
 import { backendApi } from '../lib/backend';
+import { formatRoles } from '../lib/roles';
 import type { UserProfile } from '../types/api';
 
 export default function OrganizerProfilePage({ navigation }: any) {
@@ -36,11 +37,7 @@ export default function OrganizerProfilePage({ navigation }: any) {
     }
   }, []);
 
-  useFocusEffect(
-    useCallback(() => {
-      void load();
-    }, [load]),
-  );
+  useFocusEffect(useCallback(() => { void load(); }, [load]));
 
   const save = async () => {
     setSaving(true);
@@ -79,15 +76,15 @@ export default function OrganizerProfilePage({ navigation }: any) {
     >
       <Text style={styles.eyebrow}>My Account</Text>
       <Text style={styles.title}>내 정보</Text>
-      <Text style={styles.subtitle}>계정 정보 확인과 수정만 이 화면에서 처리합니다.</Text>
+      <Text style={styles.subtitle}>주최자 계정 정보를 확인하고 표시 이름을 수정할 수 있습니다.</Text>
 
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>계정 정보 보기</Text>
-        <Text style={styles.label}>이메일</Text>
-        <Text style={styles.value}>{profile?.email || '-'}</Text>
+        <Text style={styles.cardTitle}>계정 정보</Text>
+        <Text style={styles.label}>이메일 또는 지갑</Text>
+        <Text style={styles.value}>{profile?.email || profile?.walletAddress || '-'}</Text>
 
         <Text style={styles.label}>권한</Text>
-        <Text style={styles.value}>{profile?.roles?.join(', ') || '-'}</Text>
+        <Text style={styles.value}>{formatRoles(profile?.roles)}</Text>
 
         <Text style={styles.label}>표시 이름</Text>
         {editing ? (
@@ -113,12 +110,9 @@ export default function OrganizerProfilePage({ navigation }: any) {
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>메인 화면 이동</Text>
-        <TouchableOpacity style={styles.secondaryButton} onPress={() => navigation.navigate('Organizer')}>
-          <Text style={styles.secondaryButtonText}>주최자 메인으로 이동</Text>
-        </TouchableOpacity>
+        <Text style={styles.cardTitle}>화면 이동</Text>
         <TouchableOpacity style={styles.secondaryButton} onPress={() => navigation.navigate('Main')}>
-          <Text style={styles.secondaryButtonText}>사용자 메인으로 이동</Text>
+          <Text style={styles.secondaryButtonText}>사용자 메인 이동</Text>
         </TouchableOpacity>
       </View>
 

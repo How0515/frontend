@@ -3,6 +3,7 @@ import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } fr
 import { accountStatusMessage, errorMessage, routeForEntry } from '../lib/account';
 import { getAccessToken } from '../lib/auth';
 import { backendApi } from '../lib/backend';
+import { hasOrganizerAccess } from '../lib/roles';
 
 export default function LandingPage({ navigation }: any) {
   const [checkingRole, setCheckingRole] = useState<'USER' | 'ORGANIZER' | null>(null);
@@ -20,6 +21,11 @@ export default function LandingPage({ navigation }: any) {
       const statusMessage = accountStatusMessage(profile.status);
       if (statusMessage) {
         Alert.alert('계정 사용 불가', statusMessage);
+        return;
+      }
+      if (role === 'ORGANIZER' && !hasOrganizerAccess(profile.roles)) {
+        Alert.alert('주최자 승인 대기 중입니다.', '관리자 승인 후 주최자 기능을 사용할 수 있습니다.');
+        navigation.navigate('Organizer');
         return;
       }
 

@@ -14,6 +14,7 @@ import {
 import { backendApi } from '../lib/backend';
 import { clearAccessToken } from '../lib/auth';
 import { errorMessage } from '../lib/account';
+import { formatRoles } from '../lib/roles';
 import type { UserProfile } from '../types/api';
 
 export default function MyPage({ navigation }: any) {
@@ -94,7 +95,7 @@ export default function MyPage({ navigation }: any) {
         <Text style={styles.value}>{profile?.email || profile?.walletAddress || '-'}</Text>
 
         <Text style={styles.label}>권한</Text>
-        <Text style={styles.value}>{profile?.roles?.join(', ') || 'USER'}</Text>
+        <Text style={styles.value}>{formatRoles(profile?.roles)}</Text>
 
         <Text style={styles.label}>표시 이름</Text>
         {editing ? (

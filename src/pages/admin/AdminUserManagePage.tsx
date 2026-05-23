@@ -131,12 +131,15 @@ export function AdminUserManagePage() {
     });
   }, [items, query]);
 
-  async function runAction(userId: string, action: "suspend" | "activate" | "delete" | "validator") {
+  async function runAction(userId: string, action: "suspend" | "activate" | "delete" | "grantValidator" | "revokeValidator" | "grantOrganizer" | "revokeOrganizer") {
     const confirmMessages: Record<typeof action, string> = {
       suspend: "이 사용자를 정지할까요?",
       activate: "이 사용자를 다시 활성화할까요?",
       delete: "이 사용자를 삭제 처리할까요?",
-      validator: "이 사용자에게 전역 검증자 권한을 부여할까요?",
+      grantValidator: "이 사용자에게 검증자 권한을 부여할까요?",
+      revokeValidator: "이 사용자에게서 검증자 권한을 회수할까요?",
+      grantOrganizer: "이 사용자에게 주최자 권한을 부여할까요?",
+      revokeOrganizer: "이 사용자에게서 주최자 권한을 회수할까요?",
     };
 
     if (!window.confirm(confirmMessages[action])) {
@@ -158,9 +161,21 @@ export function AdminUserManagePage() {
         await backendApi.deleteUser(userId);
         setActionMessage("사용자를 삭제 처리했습니다.");
       }
-      if (action === "validator") {
+      if (action === "grantValidator") {
         await backendApi.grantValidator(userId);
-        setActionMessage("전역 검증자 권한을 부여했습니다.");
+        setActionMessage("검증자 권한을 부여했습니다.");
+      }
+      if (action === "revokeValidator") {
+        await backendApi.revokeValidator(userId);
+        setActionMessage("검증자 권한을 회수했습니다.");
+      }
+      if (action === "grantOrganizer") {
+        await backendApi.grantOrganizer(userId);
+        setActionMessage("주최자 권한을 부여했습니다.");
+      }
+      if (action === "revokeOrganizer") {
+        await backendApi.revokeOrganizer(userId);
+        setActionMessage("주최자 권한을 회수했습니다.");
       }
       await load();
     } catch (cause) {
@@ -222,6 +237,9 @@ export function AdminUserManagePage() {
         .user-wallet { color: var(--txt-sub); font-size: 0.8rem; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .user-role-list { display: flex; flex-wrap: wrap; gap: 0.3rem; }
         .user-role { display: inline-flex; align-items: center; border-radius: 999px; background: #f1f5f9; color: #475569; padding: 0.25rem 0.55rem; font-size: 0.74rem; font-weight: 700; white-space: nowrap; }
+        .user-role.validator { background: #fff7ed; color: #c2410c; }
+        .user-role.organizer { background: #e8f5e9; color: #2e7d32; }
+        .user-role.admin { background: #fce4ec; color: #c62828; }
         .user-status { display: inline-flex; align-items: center; border-radius: 999px; padding: 0.28rem 0.65rem; font-size: 0.75rem; font-weight: 700; white-space: nowrap; }
         .user-status.active { background: #e8f5e9; color: #2e7d32; }
         .user-status.suspended { background: #fff3e0; color: #e65100; }
@@ -259,7 +277,7 @@ export function AdminUserManagePage() {
           </div>
 
           <div className="user-note">
-            전역 검증자는 모든 이벤트의 QR 체크인을 처리할 수 있는 계정입니다.
+            <strong>검증자</strong>: 현장에서 QR 체크인 처리를 수행할 수 있는 권한입니다. 전역 검증자는 모든 이벤트의 체크인을 처리할 수 있습니다.
           </div>
 
           <div className="user-filter-tabs">
@@ -329,6 +347,7 @@ export function AdminUserManagePage() {
                       const isSuspended = status === "SUSPENDED";
                       const isDeleted = status === "DELETED";
                       const hasValidatorRole = user.roles?.includes("VALIDATOR");
+                      const hasOrganizerRole = user.roles?.includes("ORGANIZER");
 
                       return (
                         <tr key={user.id}>
@@ -340,7 +359,7 @@ export function AdminUserManagePage() {
                           <td>
                             <div className="user-role-list">
                               {(user.roles?.length ? user.roles : ["USER"]).map((role) => (
-                                <span className="user-role" key={role}>
+                                <span className={`user-role ${role.toLowerCase()}`} key={role}>
                                   {ROLE_LABEL[role] ?? role}
                                 </span>
                               ))}
@@ -380,11 +399,20 @@ export function AdminUserManagePage() {
                               )}
                               <button
                                 className="user-action-btn"
-                                disabled={isBusy || isDeleted || hasValidatorRole}
-                                onClick={() => void runAction(user.id, "validator")}
+                                disabled={isBusy || isDeleted}
+                                onClick={() => void runAction(user.id, hasValidatorRole ? "revokeValidator" : "grantValidator")}
+                                type="button"
+                                title="검증자: 현장에서 QR 체크인 처리를 수행할 수 있는 권한입니다."
+                              >
+                                {hasValidatorRole ? "검증자 회수" : "검증자 부여"}
+                              </button>
+                              <button
+                                className="user-action-btn"
+                                disabled={isBusy || isDeleted}
+                                onClick={() => void runAction(user.id, hasOrganizerRole ? "revokeOrganizer" : "grantOrganizer")}
                                 type="button"
                               >
-                                {hasValidatorRole ? "검증자 부여됨" : "검증자 부여하기"}
+                                {hasOrganizerRole ? "주최자 회수" : "주최자 부여"}
                               </button>
                               <button
                                 className="user-action-btn danger"

@@ -28,9 +28,9 @@ const userTabs: TabItem[] = [
 ];
 
 const organizerTabs: TabItem[] = [
-  { label: '센터', target: 'Organizer', matches: ['Organizer'] },
-  { label: '내 이벤트', target: 'MyEvents', matches: ['MyEvents', 'EventCreate', 'OrganizerEventDetail', 'EventSettings'] },
-  { label: '티켓', target: 'SalesStatus', matches: ['SalesStatus', 'TicketExplore', 'TicketIssue'] },
+  { label: '메인', target: 'Organizer', matches: ['Organizer'] },
+  { label: '이벤트', target: 'MyEvents', matches: ['MyEvents', 'EventCreate', 'OrganizerEventDetail', 'EventSettings'] },
+  { label: '티켓 판매', target: 'SalesStatus', matches: ['SalesStatus', 'TicketExplore', 'TicketIssue'] },
   { label: '체크인', target: 'CheckInHome', matches: ['CheckInHome', 'CheckInManage', 'CheckInStatus', 'CheckInScan'] },
   { label: '내 정보', target: 'OrganizerProfile', matches: ['OrganizerProfile', 'OrganizerLogout'] },
 ];

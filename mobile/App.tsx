@@ -3,7 +3,7 @@ import React from 'react';
 import { AppKit, AppKitProvider } from '@reown/appkit-react-native';
 import { createNavigationContainerRef, NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
-import { Platform, StyleSheet, View } from 'react-native';
+import { Alert, Platform, StyleSheet, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import LandingPage from './src/pages/LandingPage';
@@ -35,6 +35,8 @@ import DisputeCreatePage from './src/pages/DisputeCreatePage';
 import MyDisputesPage from './src/pages/MyDisputesPage';
 import BottomNavigation from './src/components/BottomNavigation';
 import { appKit } from './src/lib/appkit';
+import { backendApi } from './src/lib/backend';
+import { hasOrganizerAccess } from './src/lib/roles';
 
 const Stack = createStackNavigator();
 const navigationRef = createNavigationContainerRef<any>();
@@ -62,10 +64,33 @@ export default function App() {
     }
   }, []);
 
-  const navigateFromBottom = React.useCallback((routeName: string) => {
+  const navigateFromBottom = React.useCallback(async (routeName: string) => {
     const eventScopedRoutes = new Set(['TicketIssue', 'TicketExplore', 'CheckInStatus', 'EventSettings', 'CheckInManage']);
+    const organizerRoutes = new Set([
+      'Organizer',
+      'MyEvents',
+      'EventCreate',
+      'OrganizerEventDetail',
+      'EventSettings',
+      'SalesStatus',
+      'TicketExplore',
+      'TicketIssue',
+      'CheckInHome',
+      'CheckInManage',
+      'CheckInStatus',
+      'OrganizerProfile',
+    ]);
 
     if (navigationRef.isReady()) {
+      if (organizerRoutes.has(routeName)) {
+        const profile = await backendApi.getMe().catch(() => null);
+        if (!profile || !hasOrganizerAccess(profile.roles)) {
+          Alert.alert('주최자 승인 대기 중입니다.', '관리자 승인 후 주최자 기능을 사용할 수 있습니다.');
+          navigationRef.navigate('Organizer');
+          return;
+        }
+      }
+
       if (eventScopedRoutes.has(routeName)) {
         const currentParams = navigationRef.getCurrentRoute()?.params as { eventId?: string } | undefined;
         const currentEventId = currentParams?.eventId;

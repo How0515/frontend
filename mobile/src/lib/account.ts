@@ -1,4 +1,5 @@
 import type { UserProfile } from '../types/api';
+import { hasOrganizerAccess } from './roles';
 
 type EntryRole = 'USER' | 'ORGANIZER';
 
@@ -18,8 +19,7 @@ export function routeForEntry(profile: UserProfile, entryRole: EntryRole) {
     return 'Main';
   }
 
-  const roles = profile.roles ?? [];
-  return roles.includes('ORGANIZER') || roles.includes('ADMIN') ? 'Organizer' : 'Organizer';
+  return hasOrganizerAccess(profile.roles) ? 'Organizer' : 'Main';
 }
 
 export function errorMessage(error: any, fallback = '요청을 처리하지 못했습니다.') {
