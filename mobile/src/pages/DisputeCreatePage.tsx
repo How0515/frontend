@@ -38,7 +38,8 @@ const DISPUTE_TYPES = [
 
 function formatDate(value?: string) {
   if (!value) return '-';
-  return new Date(value).toLocaleString();
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString('ko-KR');
 }
 
 function ticketIdOf(ticket?: TicketDetail | null) {
@@ -280,7 +281,12 @@ export default function DisputeCreatePage({ route, navigation }: any) {
               return (
                 <TouchableOpacity key={optionId} style={[styles.optionCard, selectedTicketId === optionId && styles.selectedOptionCard]} onPress={() => setSelectedTicketId(optionId)}>
                   {selectedTicketId === optionId ? <Text style={styles.selectedBadge}>선택됨</Text> : null}
-                  <TargetSummary title={option.event?.name || option.ticket.eventTitle || option.ticket.eventName || '이벤트'} seat={option.ticket.seatInfo} date={option.event?.eventAt || option.ticket.eventDateTime} />
+                  <TargetSummary
+                    title={option.event?.name || option.event?.title || option.ticket.eventTitle || option.ticket.eventName || '티켓 신고'}
+                    venue={option.event?.venue || option.ticket.venue}
+                    date={option.event?.eventAt || option.event?.eventDateTime || option.ticket.eventDateTime}
+                    seat={option.ticket.seatInfo}
+                  />
                 </TouchableOpacity>
               );
             }) : <Text style={styles.emptyText}>신고할 수 있는 내 티켓을 찾지 못했습니다.</Text>}
@@ -298,14 +304,42 @@ export default function DisputeCreatePage({ route, navigation }: any) {
                 }}>
                   {selectedResaleListingId === optionId ? <Text style={styles.selectedBadge}>선택됨</Text> : null}
                   <TargetSummary
-                    title={option.event?.name || option.listing.eventName || option.ticket?.eventTitle || '리셀 거래'}
+                    title={option.event?.name || option.event?.title || option.listing.eventName || option.ticket?.eventTitle || '리셀 거래 신고'}
+                    venue={option.event?.venue || option.ticket?.venue}
+                    date={option.event?.eventAt || option.event?.eventDateTime || option.ticket?.eventDateTime}
                     seat={option.ticket?.seatInfo || option.listing.seatInfo}
-                    date={option.listing.purchasedAt || option.listing.createdAt}
                     price={`${option.listing.priceWei ?? option.listing.price ?? '-'} WEI`}
+                    transactionDate={option.listing.purchasedAt || option.listing.createdAt}
                   />
                 </TouchableOpacity>
               );
             }) : <Text style={styles.emptyText}>관련 리셀 거래를 찾지 못했습니다.</Text>}
+          </View>
+        ) : null}
+
+        {(hasDirectTarget || isEditing) && targetType === 'ticket' && selectedTicket ? (
+          <View style={[styles.optionCard, styles.selectedOptionCard, styles.directTargetCard]}>
+            <Text style={styles.selectedBadge}>선택됨</Text>
+            <TargetSummary
+              title={selectedTicket.event?.name || selectedTicket.event?.title || selectedTicket.ticket.eventTitle || selectedTicket.ticket.eventName || '티켓 신고'}
+              venue={selectedTicket.event?.venue || selectedTicket.ticket.venue}
+              date={selectedTicket.event?.eventAt || selectedTicket.event?.eventDateTime || selectedTicket.ticket.eventDateTime}
+              seat={selectedTicket.ticket.seatInfo}
+            />
+          </View>
+        ) : null}
+
+        {(hasDirectTarget || isEditing) && targetType === 'resale' && selectedResale ? (
+          <View style={[styles.optionCard, styles.selectedOptionCard, styles.directTargetCard]}>
+            <Text style={styles.selectedBadge}>선택됨</Text>
+            <TargetSummary
+              title={selectedResale.event?.name || selectedResale.event?.title || selectedResale.listing.eventName || selectedResale.ticket?.eventTitle || '리셀 거래 신고'}
+              venue={selectedResale.event?.venue || selectedResale.ticket?.venue}
+              date={selectedResale.event?.eventAt || selectedResale.event?.eventDateTime || selectedResale.ticket?.eventDateTime}
+              seat={selectedResale.ticket?.seatInfo || selectedResale.listing.seatInfo}
+              price={`${selectedResale.listing.priceWei ?? selectedResale.listing.price ?? '-'} WEI`}
+              transactionDate={selectedResale.listing.purchasedAt || selectedResale.listing.createdAt}
+            />
           </View>
         ) : null}
 
@@ -357,13 +391,29 @@ export default function DisputeCreatePage({ route, navigation }: any) {
   );
 }
 
-function TargetSummary({ title, seat, date, price }: { title: string; seat?: string; date?: string; price?: string }) {
+function TargetSummary({
+  title,
+  venue,
+  date,
+  seat,
+  price,
+  transactionDate,
+}: {
+  title: string;
+  venue?: string;
+  date?: string;
+  seat?: string;
+  price?: string;
+  transactionDate?: string;
+}) {
   return (
     <View>
       <Text style={styles.summaryTitle}>{title}</Text>
+      <Text style={styles.summaryMeta}>장소: {venue || '-'}</Text>
+      <Text style={styles.summaryMeta}>날짜/시간: {formatDate(date)}</Text>
       <Text style={styles.summaryMeta}>좌석: {seat || '-'}</Text>
-      {price ? <Text style={styles.summaryMeta}>가격: {price}</Text> : null}
-      <Text style={styles.summaryMeta}>일시: {formatDate(date)}</Text>
+      {price ? <Text style={styles.summaryMeta}>거래 가격: {price}</Text> : null}
+      {transactionDate ? <Text style={styles.summaryMeta}>거래 일시: {formatDate(transactionDate)}</Text> : null}
     </View>
   );
 }
@@ -386,6 +436,7 @@ const styles = StyleSheet.create({
   optionList: { marginTop: 14, gap: 10 },
   optionCard: { borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 14, padding: 14, backgroundColor: '#FFFFFF' },
   selectedOptionCard: { borderColor: '#2563EB', backgroundColor: '#EFF6FF' },
+  directTargetCard: { marginTop: 14 },
   selectedBadge: { alignSelf: 'flex-start', overflow: 'hidden', borderRadius: 999, backgroundColor: '#2563EB', color: '#FFFFFF', paddingHorizontal: 9, paddingVertical: 4, fontSize: 11, fontWeight: '900', marginBottom: 8 },
   emptyTargetBox: { marginTop: 14, borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 14, padding: 14, backgroundColor: '#F8FAFC' },
   emptyTargetTitle: { color: '#0F172A', fontWeight: '900', fontSize: 14 },

@@ -30,9 +30,11 @@ const DONE_STATUSES = new Set(['RESOLVED', 'REJECTED', 'CLOSED', 'CANCELED', 'CA
 
 type DisputeTargetSummary = {
   title: string;
+  venue?: string;
+  eventDate?: string;
   seat?: string;
   price?: string;
-  date?: string;
+  transactionDate?: string;
   kind: string;
 };
 
@@ -160,14 +162,16 @@ export default function MyDisputesPage({ navigation }: any) {
                   <Text style={[styles.badgeText, badge.textStyle]}>{badge.label}</Text>
                 </View>
               </View>
-              <Text style={styles.cardTitle}>{TYPE_LABEL[item.type ?? 'OTHER'] ?? item.type ?? '분쟁'}</Text>
               <View style={styles.targetBox}>
                 <Text style={styles.targetKind}>{summary?.kind ?? (item.resaleListingId ? '리셀 거래' : '내 티켓')}</Text>
                 <Text style={styles.targetTitle}>{summary?.title ?? '분쟁 대상 정보를 불러오는 중입니다.'}</Text>
+                <Text style={styles.meta}>장소 {summary?.venue || '-'}</Text>
+                <Text style={styles.meta}>날짜/시간 {formatDate(summary?.eventDate || item.createdAt)}</Text>
                 <Text style={styles.meta}>좌석 {summary?.seat || '-'}</Text>
                 {summary?.price ? <Text style={styles.meta}>가격 {summary.price} WEI</Text> : null}
-                <Text style={styles.meta}>일시 {formatDate(summary?.date || item.createdAt)}</Text>
+                {summary?.transactionDate ? <Text style={styles.meta}>거래 일시 {formatDate(summary.transactionDate)}</Text> : null}
               </View>
+              <Text style={styles.cardTitle}>신고 유형: {TYPE_LABEL[item.type ?? 'OTHER'] ?? item.type ?? '분쟁'}</Text>
               <Text style={styles.description}>{item.description}</Text>
               {item.resolutionNote ? <Text style={styles.note}>처리 메모: {item.resolutionNote}</Text> : null}
               {editable ? (
@@ -192,6 +196,7 @@ async function loadTargetSummary(item: DisputeRecord): Promise<DisputeTargetSumm
   const embedded = item as DisputeRecord & {
     eventName?: string;
     eventTitle?: string;
+    venue?: string;
     seatInfo?: string;
     priceWei?: string;
     price?: string;
@@ -202,9 +207,11 @@ async function loadTargetSummary(item: DisputeRecord): Promise<DisputeTargetSumm
   if (embedded.eventName || embedded.eventTitle || embedded.seatInfo || embedded.priceWei || embedded.price) {
     return {
       title: embedded.eventName || embedded.eventTitle || '분쟁 대상',
+      venue: embedded.venue,
+      eventDate: embedded.eventAt || embedded.eventDateTime,
       seat: embedded.seatInfo,
       price: embedded.priceWei || embedded.price,
-      date: embedded.eventAt || embedded.eventDateTime || item.createdAt,
+      transactionDate: item.resaleListingId ? item.createdAt : undefined,
       kind: item.resaleListingId ? '리셀 거래' : '내 티켓',
     };
   }
@@ -212,11 +219,17 @@ async function loadTargetSummary(item: DisputeRecord): Promise<DisputeTargetSumm
   if (item.resaleListingId) {
     const listing = await backendApi.getResaleListing(String(item.resaleListingId)).catch(() => undefined as ResaleListing | undefined);
     if (listing) {
+      const [ticket, event] = await Promise.all([
+        backendApi.getTicket(String(listing.ticketId)).catch(() => undefined as TicketDetail | undefined),
+        backendApi.getEvent(String(listing.eventId)).catch(() => undefined),
+      ]);
       return {
-        title: listing.eventName || '리셀 거래',
-        seat: listing.seatInfo,
+        title: event?.name || event?.title || listing.eventName || ticket?.eventTitle || '리셀 거래 신고',
+        venue: event?.venue || ticket?.venue,
+        eventDate: event?.eventAt || event?.eventDateTime || ticket?.eventDateTime,
+        seat: ticket?.seatInfo || listing.seatInfo,
         price: listing.priceWei || listing.price,
-        date: listing.purchasedAt || listing.createdAt || item.createdAt,
+        transactionDate: listing.purchasedAt || listing.createdAt || item.createdAt,
         kind: '리셀 거래',
       };
     }
@@ -225,11 +238,13 @@ async function loadTargetSummary(item: DisputeRecord): Promise<DisputeTargetSumm
   if (item.ticketId) {
     const ticket = await backendApi.getTicket(String(item.ticketId)).catch(() => undefined as TicketDetail | undefined);
     if (ticket) {
+      const event = ticket.eventId ? await backendApi.getEvent(String(ticket.eventId)).catch(() => undefined) : undefined;
       return {
-        title: ticket.eventTitle || ticket.eventName || '내 티켓',
+        title: event?.name || event?.title || ticket.eventTitle || ticket.eventName || '티켓 신고',
+        venue: event?.venue || ticket.venue,
+        eventDate: event?.eventAt || event?.eventDateTime || ticket.eventDateTime,
         seat: ticket.seatInfo,
         price: ticket.priceWei || ticket.originalPriceWei,
-        date: ticket.eventDateTime || ticket.createdAt || item.createdAt,
         kind: '내 티켓',
       };
     }
@@ -237,7 +252,7 @@ async function loadTargetSummary(item: DisputeRecord): Promise<DisputeTargetSumm
 
   return {
     title: item.resaleListingId ? '리셀 거래 신고' : '티켓 신고',
-    date: item.createdAt,
+    eventDate: item.createdAt,
     kind: item.resaleListingId ? '리셀 거래' : '내 티켓',
   };
 }
@@ -268,7 +283,7 @@ const styles = StyleSheet.create({
   card: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: '#E2E8F0' },
   cardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
   status: { color: '#2563EB', fontWeight: '900', marginBottom: 6 },
-  cardTitle: { color: '#0F172A', fontSize: 18, fontWeight: '900' },
+  cardTitle: { marginTop: 10, color: '#0F172A', fontSize: 14, fontWeight: '900' },
   targetBox: { marginTop: 10, borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 12, padding: 12, backgroundColor: '#F8FAFC' },
   targetKind: { color: '#2563EB', fontWeight: '900', fontSize: 12 },
   targetTitle: { marginTop: 4, color: '#0F172A', fontSize: 15, fontWeight: '900' },

@@ -34,10 +34,10 @@ Routes are defined in `src/routes.tsx`.
 
 ### Main Screens
 
-- **Dashboard**: Shows key admin work items and operational metrics.
+- **Dashboard**: Shows review queues first: pending organizer approvals, pending event review, pending disputes, and operational metrics.
 - **Organizer Approvals**: Reviews organizer applications.
 - **Event Supervision**: Manages event review flags, admin cancellation, and reactivation.
-- **User Management**: Manages user status and grants global validator permission.
+- **User Management**: Manages user status and grants or revokes organizer and global validator roles. Status and role filters are separated, and role filters use AND matching.
 - **Dispute/Transaction Center**: Reviews user disputes and monitors resale transactions.
 - **Blockchain Logs**: Shows submitted or simulated blockchain actions recorded by the backend.
 
@@ -117,7 +117,7 @@ Mobile API calls are centralized in `frontend/mobile/src/lib/backend.ts`.
 - Axios
 - expo-secure-store
 - expo-camera
-- MetaMask Connect EVM
+- Reown AppKit / WalletConnect for mobile wallet connection
 - react-native-qrcode-svg
 
 ## Running Locally
@@ -268,13 +268,24 @@ Admin cancellation is distinguished by the backend `adminCanceled` field.
 | Global validator | Can process QR check-ins for all events. |
 | Event validator | Can process QR check-ins only for a specific event. |
 
-The admin web currently grants global validator permission. Global validator removal is not implemented yet.
+The admin web can grant and revoke global validator permission. Organizer role grant/revoke is also available from user management.
 
 ### Disputes
 
 - Users create disputes in the mobile app.
+- Dispute target selection is based on user-readable ticket or resale transaction cards.
+- Target cards prioritize event name, venue, event date/time, and seat. Resale disputes also show transaction price and transaction time when available.
+- Duplicate active disputes are blocked by user + ticket/listing target, and the user-facing message states that the same ticket or transaction was already reported.
+- Users can edit or cancel disputes while they are still in an early status such as `OPEN` or `RECEIVED`.
 - Admins review disputes in the admin web.
 - Resale transaction monitoring is part of the admin dispute/transaction center.
+
+### Organizer Ticket Issuance
+
+- Default seat sections are `A`, `B`, `C`, `D`, and `VIP`.
+- Organizers can add custom seat sections, and newly added sections become selectable immediately.
+- Issued ticket seat prefixes are not automatically merged into the editable seat-section list, so accidental prefixes such as partial `R` or `X` values do not appear as default filters.
+- Seat sections that already have issued tickets cannot be deleted.
 
 ### Blockchain Logs
 
@@ -304,8 +315,11 @@ npx tsc --noEmit
 
 ## Remaining Work
 
-- Decide whether to add global validator removal.
 - Decide whether every blockchain submission failure should be persisted as `FAILED`.
 - Add explorer links when a real blockchain network is configured.
-- Replace demo-oriented QR signing with real mobile wallet signing.
+- Replace demo-oriented QR signing with real mobile wallet signing or a production-grade check-in token flow.
 - Decide whether reviewed events need a dedicated queue beyond the current filter.
+- Add ticket cancellation APIs for issued tickets, for example `PATCH /tickets/{ticketId}/cancel` or bulk cancellation by event.
+- Consider returning dispute target summaries directly from `GET /disputes/me` so the mobile app does not need per-item ticket/resale/event enrichment calls.
+- Add backend dashboard metrics for active ticket count if the admin dashboard should show exact selling-ticket counts without a placeholder.
+- Consider a dedicated event approval/review status separate from `ACTIVE`/`INACTIVE` if event registration review becomes more formal.
