@@ -1,8 +1,29 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import { backendApi } from '../lib/backend';
 import type { TicketDetail, TicketQr } from '../types/api';
+
+const TICKET_STATUS_LABEL: Record<string, string> = {
+  LISTED: '판매중',
+  ISSUED: '입장 가능',
+  OWNED: '입장 가능',
+  SOLD: '입장 가능',
+  USED: '체크인 완료',
+  EXPIRED: '만료됨',
+  CANCELED: '사용 불가',
+  CANCELLED: '사용 불가',
+};
+
+function statusLabel(status?: string) {
+  const key = status?.toUpperCase() ?? '';
+  return TICKET_STATUS_LABEL[key] ?? status ?? '-';
+}
+
+function isUsable(status?: string) {
+  const key = status?.toUpperCase() ?? '';
+  return key === 'SOLD' || key === 'ISSUED' || key === 'OWNED' || key === 'LISTED';
+}
 
 export default function TicketQrPage({ route }: any) {
   const { ticketId } = route.params;
@@ -38,29 +59,50 @@ export default function TicketQrPage({ route }: any) {
   };
 
   useEffect(() => {
-    loadQr();
+    void loadQr();
   }, [ticketId]);
+
+  const qrValue = qr?.payload || JSON.stringify({ ticketId, owner: ticket?.ownerWalletAddress });
+  const ticketNumber = qr?.barcodeText || ticket?.contractTokenId || String(ticketId);
+  const usable = isUsable(ticket?.status);
+  const status = statusLabel(ticket?.status);
+  const expiresText = useMemo(() => (qr?.expiresAt ? new Date(qr.expiresAt).toLocaleString() : '-'), [qr?.expiresAt]);
 
   if (loading) return <View style={styles.center}><ActivityIndicator size="large" color="#007AFF" /></View>;
 
-  const qrValue = qr?.payload || JSON.stringify({ ticketId, owner: ticket?.ownerWalletAddress });
-
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <View style={styles.card}>
-        {qr?.qrPngBase64 ? (
-          <Image style={styles.qrImage} source={{ uri: `data:image/png;base64,${qr.qrPngBase64}` }} />
-        ) : (
-          <QRCode value={qrValue} size={220} />
-        )}
-        <Text style={styles.hint}>입장 시 이 화면을 제시하세요.</Text>
+      <View style={styles.statusRow}>
+        <View style={[styles.statusBadge, usable ? styles.usableBadge : styles.disabledBadge]}>
+          <Text style={[styles.statusText, usable ? styles.usableText : styles.disabledText]}>{status}</Text>
+        </View>
       </View>
-      <View style={styles.card}>
-        <Text style={styles.label}>바코드</Text>
-        <Text style={styles.barcode}>{qr?.barcodeText || String(ticketId)}</Text>
-        <Text style={styles.expires}>서명 대상: {messageHash ? `${messageHash.slice(0, 12)}...` : '-'}</Text>
-        <Text style={styles.expires}>만료: {qr?.expiresAt ? new Date(qr.expiresAt).toLocaleString() : '-'}</Text>
+
+      <View style={styles.qrCard}>
+        <Text style={styles.cardTitle}>모바일 체크인 QR</Text>
+        <Text style={styles.cardText}>입장 시 스태프에게 이 QR 코드를 제시해주세요.</Text>
+        <View style={styles.qrFrame}>
+          {qr?.qrPngBase64 ? (
+            <Image style={styles.qrImage} source={{ uri: `data:image/png;base64,${qr.qrPngBase64}` }} />
+          ) : (
+            <QRCode value={qrValue} size={240} />
+          )}
+        </View>
+        <Text style={styles.expires}>만료 시간 {expiresText}</Text>
       </View>
+
+      <View style={styles.infoCard}>
+        <Text style={styles.infoTitle}>티켓 번호</Text>
+        <Text style={styles.ticketNumber}>{ticketNumber}</Text>
+        <Text style={styles.infoText}>현재 바코드는 별도 스캐너 연동 없이 티켓 식별 번호로만 표시됩니다.</Text>
+      </View>
+
+      <View style={styles.infoCard}>
+        <Text style={styles.infoTitle}>QR 갱신</Text>
+        <Text style={styles.infoText}>QR 새로고침은 5분 유효기간의 체크인 payload를 다시 발급합니다. 현재 모바일 서명은 개발용 서명값을 사용 중입니다.</Text>
+        {messageHash ? <Text style={styles.hashText}>서명 메시지 {messageHash.slice(0, 12)}...</Text> : null}
+      </View>
+
       <TouchableOpacity style={styles.button} onPress={loadQr}>
         <Text style={styles.buttonText}>QR 새로고침</Text>
       </TouchableOpacity>
@@ -72,12 +114,24 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F8F9FA' },
   content: { padding: 20, alignItems: 'stretch' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  card: { backgroundColor: '#fff', borderRadius: 12, padding: 24, marginBottom: 14, alignItems: 'center', borderWidth: 1, borderColor: '#E9ECEF' },
-  qrImage: { width: 220, height: 220 },
-  hint: { color: '#868E96', marginTop: 16 },
-  label: { color: '#868E96', fontWeight: '800', marginBottom: 8 },
-  barcode: { color: '#212529', fontSize: 20, fontWeight: '900', textAlign: 'center' },
-  expires: { color: '#868E96', marginTop: 10 },
+  statusRow: { alignItems: 'flex-start', marginBottom: 12 },
+  statusBadge: { borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7 },
+  usableBadge: { backgroundColor: '#ECFDF5' },
+  disabledBadge: { backgroundColor: '#F1F5F9' },
+  statusText: { fontSize: 13, fontWeight: '900' },
+  usableText: { color: '#047857' },
+  disabledText: { color: '#64748B' },
+  qrCard: { backgroundColor: '#fff', borderRadius: 12, padding: 22, marginBottom: 14, alignItems: 'center', borderWidth: 1, borderColor: '#E9ECEF' },
+  cardTitle: { color: '#212529', fontSize: 20, fontWeight: '900', marginBottom: 8 },
+  cardText: { color: '#64748B', fontSize: 14, lineHeight: 20, textAlign: 'center', marginBottom: 18 },
+  qrFrame: { padding: 10, backgroundColor: '#FFFFFF', borderRadius: 10 },
+  qrImage: { width: 240, height: 240 },
+  expires: { color: '#495057', marginTop: 16, fontWeight: '800' },
+  infoCard: { backgroundColor: '#fff', borderRadius: 12, padding: 16, marginBottom: 14, borderWidth: 1, borderColor: '#E9ECEF' },
+  infoTitle: { color: '#212529', fontSize: 15, fontWeight: '900', marginBottom: 8 },
+  ticketNumber: { color: '#212529', fontSize: 18, fontWeight: '900', marginBottom: 8 },
+  infoText: { color: '#64748B', fontSize: 13, lineHeight: 20 },
+  hashText: { color: '#868E96', marginTop: 10, fontSize: 12, fontWeight: '800' },
   button: { backgroundColor: '#007AFF', padding: 16, borderRadius: 12, alignItems: 'center' },
   buttonText: { color: '#fff', fontWeight: '900' },
 });

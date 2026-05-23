@@ -3,6 +3,27 @@ import { ActivityIndicator, FlatList, StyleSheet, Text, TouchableOpacity, View }
 import { backendApi } from '../lib/backend';
 import type { EventDetail, TicketDetail } from '../types/api';
 
+const TICKET_STATUS_LABEL: Record<string, string> = {
+  LISTED: '판매중',
+  ISSUED: '소유중',
+  OWNED: '소유중',
+  SOLD: '소유중',
+  USED: '사용완료',
+  EXPIRED: '만료됨',
+  CANCELED: '취소됨',
+  CANCELLED: '취소됨',
+};
+
+function ticketStatusLabel(status?: string) {
+  const key = status?.toUpperCase() ?? '';
+  return TICKET_STATUS_LABEL[key] ?? status ?? '-';
+}
+
+function eventDate(ticket: TicketDetail, event?: EventDetail) {
+  const value = event?.eventAt || ticket.eventDateTime;
+  return value ? new Date(value).toLocaleString() : '-';
+}
+
 export default function MyTicketsPage({ navigation }: any) {
   const [tickets, setTickets] = useState<TicketDetail[]>([]);
   const [eventsById, setEventsById] = useState<Record<string, EventDetail>>({});
@@ -22,20 +43,22 @@ export default function MyTicketsPage({ navigation }: any) {
         setLoading(false);
       }
     };
-    loadTickets();
+    void loadTickets();
   }, []);
 
   const renderTicket = ({ item }: { item: TicketDetail }) => {
     const event = eventsById[item.eventId];
+    const status = ticketStatusLabel(item.status);
     return (
       <TouchableOpacity style={styles.ticketCard} onPress={() => navigation.navigate('TicketDetail', { ticketId: item.id ?? item.ticketId })}>
         <View style={styles.ticketInfo}>
-          <Text style={styles.eventTitle}>{event?.name || item.eventTitle || item.eventName || '티켓'}</Text>
-          <Text style={styles.ticketDetails}>{item.seatInfo} | {item.status}</Text>
-          <Text style={styles.ticketPrice}>{item.originalPriceWei ?? item.priceWei ? `${item.originalPriceWei ?? item.priceWei} WEI` : ''}</Text>
+          <Text style={styles.eventTitle}>{event?.name || item.eventTitle || item.eventName || '이벤트'}</Text>
+          <Text style={styles.ticketMeta}>{event?.venue || item.venue || '-'}</Text>
+          <Text style={styles.ticketMeta}>{eventDate(item, event)}</Text>
+          <Text style={styles.ticketSeat}>좌석 {item.seatInfo || '-'}</Text>
         </View>
         <View style={styles.statusBadge}>
-          <Text style={styles.statusText}>상세</Text>
+          <Text style={styles.statusText}>{status}</Text>
         </View>
       </TouchableOpacity>
     );
@@ -62,12 +85,12 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F8F9FA' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   list: { padding: 20 },
-  ticketCard: { backgroundColor: '#fff', borderRadius: 12, padding: 20, marginBottom: 15, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#E9ECEF' },
-  ticketInfo: { flex: 1 },
-  eventTitle: { fontSize: 18, fontWeight: 'bold', color: '#212529', marginBottom: 5 },
-  ticketDetails: { fontSize: 14, color: '#868E96', marginBottom: 5 },
-  ticketPrice: { fontSize: 14, color: '#007AFF', fontWeight: 'bold' },
-  statusBadge: { backgroundColor: '#F1F3F5', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6 },
-  statusText: { fontSize: 12, color: '#495057', fontWeight: 'bold' },
+  ticketCard: { backgroundColor: '#fff', borderRadius: 12, padding: 18, marginBottom: 14, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#E9ECEF' },
+  ticketInfo: { flex: 1, paddingRight: 12 },
+  eventTitle: { fontSize: 17, fontWeight: '900', color: '#212529', marginBottom: 8 },
+  ticketMeta: { fontSize: 13, color: '#868E96', marginBottom: 4, lineHeight: 18 },
+  ticketSeat: { fontSize: 14, color: '#343A40', fontWeight: '800', marginTop: 4 },
+  statusBadge: { backgroundColor: '#EFF6FF', paddingHorizontal: 10, paddingVertical: 7, borderRadius: 999, alignSelf: 'flex-start' },
+  statusText: { fontSize: 12, color: '#2563EB', fontWeight: '900' },
   emptyText: { textAlign: 'center', color: '#868E96', fontSize: 16, paddingVertical: 100 },
 });
