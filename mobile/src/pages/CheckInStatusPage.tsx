@@ -108,11 +108,11 @@ export default function CheckInStatusPage({ route }: any) {
           <Text style={styles.title}>체크인 현황</Text>
           <View style={styles.metricGrid}>
             <Metric label="체크인 완료 티켓" value={used} />
-            <Metric label="체크인 성공 기록" value={success} />
-            <Metric label="총 체크인 기록" value={records.length} />
+            <Metric label="입장 성공 기록" value={success} />
+            <Metric label="총 입장 처리 기록" value={records.length} />
           </View>
           <View style={styles.sectionHead}>
-            <Text style={styles.sectionTitle}>체크인 기록</Text>
+            <Text style={styles.sectionTitle}>입장 처리 기록</Text>
             <Text style={styles.pageText}>{currentPage} / {totalPages}</Text>
           </View>
           <TextInput
@@ -147,7 +147,7 @@ export default function CheckInStatusPage({ route }: any) {
             ))}
           </View>
           <View style={styles.pageHead}>
-            <Text style={styles.pageHint}>검색된 체크인 기록 {filteredRecords.length}건</Text>
+            <Text style={styles.pageHint}>검색된 입장 처리 기록 {filteredRecords.length}건</Text>
           </View>
         </>
       }
@@ -158,7 +158,7 @@ export default function CheckInStatusPage({ route }: any) {
           {item.memo ? <Text style={styles.rowMemo}>{item.memo}</Text> : null}
         </View>
       )}
-      ListEmptyComponent={<Text style={styles.emptyText}>조건에 맞는 체크인 기록이 없습니다.</Text>}
+      ListEmptyComponent={<Text style={styles.emptyText}>조건에 맞는 입장 처리 기록이 없습니다.</Text>}
       ListFooterComponent={
         filteredRecords.length > PAGE_SIZE ? (
           <View style={styles.pagination}>
