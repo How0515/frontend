@@ -157,7 +157,11 @@ export default function EventSettingsPage({ route }: any) {
         <Text style={styles.title}>이벤트 설정</Text>
         {feedback ? <View style={styles.messageBox}><Text style={styles.messageText}>{feedback}</Text></View> : null}
 
-        <View style={styles.card}>
+        <View style={[styles.card, styles.sectionBase]}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionEyebrow}>기본 정보</Text>
+            <Text style={styles.sectionHint}>이벤트명, 장소, 일시를 관리합니다.</Text>
+          </View>
           <Text style={styles.cardTitle}>기본 정보</Text>
           <Text style={styles.label}>이벤트명</Text>
           <TextInput style={styles.input} value={name} onChangeText={setName} />
@@ -179,13 +183,17 @@ export default function EventSettingsPage({ route }: any) {
           <TextInput style={[styles.input, styles.textArea]} value={description} onChangeText={setDescription} multiline />
         </View>
 
-        <View style={styles.card}>
+        <View style={[styles.card, styles.sectionMuted]}>
           <TouchableOpacity style={styles.collapseHeader} onPress={() => setResaleOpen((value) => !value)}>
-            <Text style={styles.cardTitle}>리셀 정책</Text>
+            <View>
+              <Text style={styles.sectionEyebrow}>리셀 정책</Text>
+              <Text style={styles.cardTitle}>리셀 정책</Text>
+            </View>
             <Text style={styles.chevron}>{resaleOpen ? '⌃' : '⌄'}</Text>
           </TouchableOpacity>
           {resaleOpen ? (
             <>
+              <View style={styles.sectionDivider} />
               <TouchableOpacity style={styles.toggleRow} onPress={() => setResaleAllowed((value) => !value)}>
                 <Text style={styles.toggleLabel}>리셀 허용</Text>
                 <Text style={[styles.toggleBadge, resaleAllowed ? styles.toggleOn : styles.toggleOff]}>{resaleAllowed ? 'ON' : 'OFF'}</Text>
@@ -203,13 +211,17 @@ export default function EventSettingsPage({ route }: any) {
           ) : null}
         </View>
 
-        <View style={styles.card}>
+        <View style={[styles.card, styles.sectionDanger]}>
           <TouchableOpacity style={styles.collapseHeader} onPress={() => setStatusOpen((value) => !value)}>
-            <Text style={styles.cardTitle}>이벤트 상태</Text>
+            <View>
+              <Text style={styles.sectionEyebrow}>위험도 높은 상태</Text>
+              <Text style={styles.cardTitle}>이벤트 상태</Text>
+            </View>
             <Text style={styles.chevron}>{statusOpen ? '⌃' : '⌄'}</Text>
           </TouchableOpacity>
           {statusOpen ? (
             <>
+              <View style={styles.sectionDivider} />
               {event?.adminCanceled ? (
                 <Text style={styles.warningText}>관리자가 취소한 이벤트입니다. 주최자는 재활성화할 수 없습니다.</Text>
               ) : null}
@@ -254,6 +266,13 @@ const styles = StyleSheet.create({
   messageBox: { marginTop: 14, borderRadius: 12, padding: 12, borderWidth: 1, backgroundColor: '#EFF6FF', borderColor: '#BFDBFE' },
   messageText: { color: '#1D4ED8', fontWeight: '800' },
   card: { marginTop: 16, backgroundColor: '#FFFFFF', borderRadius: 18, padding: 16, borderWidth: 1, borderColor: '#E2E8F0' },
+  sectionBase: { backgroundColor: '#F8FAFC', borderColor: '#E2E8F0' },
+  sectionMuted: { backgroundColor: '#FFFFFF', borderColor: '#E2E8F0' },
+  sectionDanger: { backgroundColor: '#FFF7ED', borderColor: '#FDBA74' },
+  sectionHeader: { marginBottom: 12 },
+  sectionEyebrow: { color: '#2563EB', fontSize: 11, fontWeight: '900', letterSpacing: 0.4 },
+  sectionHint: { marginTop: 4, color: '#64748B', fontSize: 12, lineHeight: 18 },
+  sectionDivider: { height: 1, backgroundColor: '#E2E8F0', marginVertical: 12 },
   cardTitle: { color: '#0F172A', fontSize: 17, fontWeight: '900' },
   collapseHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   chevron: { color: '#64748B', fontSize: 20, fontWeight: '900' },

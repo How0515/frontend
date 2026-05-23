@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   ActivityIndicator,
@@ -7,6 +7,7 @@ import {
   RefreshControl,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -21,6 +22,14 @@ const STATUS_FILTERS = [
   { value: 'INACTIVE', label: '운영중지' },
   { value: 'CANCELED', label: '취소됨' },
 ] as const;
+
+const SORT_MODES = [
+  { value: 'latest', label: '최신순' },
+  { value: 'oldest', label: '오래된순' },
+] as const;
+
+const PAGE_SIZE = 8;
+const MAX_VISIBLE_PAGES = 4;
 
 function eventTitle(event: EventSummary) {
   return event.name || event.title || '제목 없는 이벤트';
@@ -47,16 +56,16 @@ export default function MyEventsPage({ navigation }: any) {
   const [events, setEvents] = useState<EventSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [page, setPage] = useState(0);
-  const [hasNext, setHasNext] = useState(false);
   const [statusFilter, setStatusFilter] = useState<(typeof STATUS_FILTERS)[number]['value']>('ALL');
+  const [sortMode, setSortMode] = useState<(typeof SORT_MODES)[number]['value']>('latest');
+  const [query, setQuery] = useState('');
+  const [page, setPage] = useState(1);
 
-  const load = useCallback(async (targetPage = 0, append = false) => {
+  const load = useCallback(async () => {
     try {
-      const data = await backendApi.getMyEvents({ page: targetPage, size: 12 });
-      setEvents((current) => sortCanceledLast(append ? [...current, ...(data.items ?? [])] : data.items ?? []));
-      setPage(data.page ?? targetPage);
-      setHasNext(data.hasNext ?? false);
+      const data = await backendApi.getMyEvents({ page: 0, size: 100 });
+      setEvents(sortCanceledLast(data.items ?? []));
+      setPage(1);
     } catch (error: any) {
       Alert.alert('이벤트 로드 실패', errorMessage(error, '내 이벤트를 불러오지 못했습니다.'));
     } finally {
@@ -67,21 +76,42 @@ export default function MyEventsPage({ navigation }: any) {
 
   useFocusEffect(
     useCallback(() => {
-      void load(0, false);
+      void load();
     }, [load]),
   );
 
   const refresh = () => {
     setRefreshing(true);
-    void load(0, false);
+    void load();
   };
 
-  const loadMore = () => {
-    if (!hasNext || loading) return;
-    void load(page + 1, true);
-  };
+  const visibleEvents = useMemo(() => {
+    const normalized = query.trim().toLowerCase();
+    const filtered = events.filter((event) => {
+      const matchesStatus = statusFilter === 'ALL' || event.status === statusFilter;
+      const haystack = `${eventTitle(event)} ${event.venue || ''} ${event.description || ''}`.toLowerCase();
+      const matchesQuery = !normalized || haystack.includes(normalized);
+      return matchesStatus && matchesQuery;
+    });
 
-  const filteredEvents = events.filter((event) => (statusFilter === 'ALL' ? true : event.status === statusFilter));
+    return [...filtered].sort((a, b) => {
+      const aTime = new Date(a.eventAt || a.eventDateTime || '').getTime();
+      const bTime = new Date(b.eventAt || b.eventDateTime || '').getTime();
+      return sortMode === 'latest'
+        ? (Number.isNaN(bTime) ? 0 : bTime) - (Number.isNaN(aTime) ? 0 : aTime)
+        : (Number.isNaN(aTime) ? 0 : aTime) - (Number.isNaN(bTime) ? 0 : bTime);
+    });
+  }, [events, query, sortMode, statusFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(visibleEvents.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const pagedEvents = useMemo(() => visibleEvents.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE), [currentPage, visibleEvents]);
+  const pageNumbers = useMemo(() => {
+    const half = Math.floor(MAX_VISIBLE_PAGES / 2);
+    const start = Math.max(1, Math.min(currentPage - half, totalPages - MAX_VISIBLE_PAGES + 1));
+    const end = Math.min(totalPages, start + MAX_VISIBLE_PAGES - 1);
+    return Array.from({ length: end - start + 1 }, (_, index) => start + index);
+  }, [currentPage, totalPages]);
 
   const renderItem = ({ item }: { item: EventSummary }) => {
     const sold = item.soldTicketCount ?? 0;
@@ -139,19 +169,43 @@ export default function MyEventsPage({ navigation }: any) {
       </View>
 
       <FlatList
-        data={filteredEvents}
+        data={pagedEvents}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
         contentContainerStyle={styles.list}
         ListHeaderComponent={
-          <ScrollFilter
-            current={statusFilter}
-            onSelect={setStatusFilter}
-          />
+          <>
+            <TextInput
+              style={styles.searchInput}
+              value={query}
+              onChangeText={(value) => {
+                setQuery(value);
+                setPage(1);
+              }}
+              placeholder="이벤트명, 장소 검색"
+              returnKeyType="search"
+            />
+            <ScrollFilter
+              current={statusFilter}
+              onSelect={(value) => {
+                setStatusFilter(value);
+                setPage(1);
+              }}
+            />
+            <View style={styles.sortRow}>
+              {SORT_MODES.map((item) => (
+                <TouchableOpacity key={item.value} style={[styles.sortChip, sortMode === item.value && styles.activeSortChip]} onPress={() => { setSortMode(item.value); setPage(1); }}>
+                  <Text style={[styles.sortChipText, sortMode === item.value && styles.activeSortChipText]}>{item.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <View style={styles.pageHead}>
+              <Text style={styles.pageHint}>검색 결과 {visibleEvents.length}건</Text>
+              <Text style={styles.pageHint}>{currentPage} / {totalPages}</Text>
+            </View>
+          </>
         }
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} />}
-        onEndReached={loadMore}
-        onEndReachedThreshold={0.25}
         ListEmptyComponent={
           <View style={styles.empty}>
             <Text style={styles.emptyTitle}>{events.length === 0 ? '등록한 이벤트가 없습니다.' : '조건에 맞는 이벤트가 없습니다.'}</Text>
@@ -162,10 +216,20 @@ export default function MyEventsPage({ navigation }: any) {
           </View>
         }
         ListFooterComponent={
-          hasNext ? (
-            <TouchableOpacity style={styles.moreButton} onPress={loadMore}>
-              <Text style={styles.moreButtonText}>더 보기</Text>
-            </TouchableOpacity>
+          visibleEvents.length > PAGE_SIZE ? (
+            <View style={styles.pagination}>
+              <TouchableOpacity style={[styles.pageButton, currentPage === 1 && styles.disabledButton]} disabled={currentPage === 1} onPress={() => setPage((value) => Math.max(value - 1, 1))}>
+                <Text style={styles.pageButtonText}>이전</Text>
+              </TouchableOpacity>
+              {pageNumbers.map((pageNumber) => (
+                <TouchableOpacity key={pageNumber} style={[styles.pageNumberButton, currentPage === pageNumber && styles.activePageNumberButton]} onPress={() => setPage(pageNumber)}>
+                  <Text style={[styles.pageNumberText, currentPage === pageNumber && styles.activePageNumberText]}>{pageNumber}</Text>
+                </TouchableOpacity>
+              ))}
+              <TouchableOpacity style={[styles.pageButton, currentPage >= totalPages && styles.disabledButton]} disabled={currentPage >= totalPages} onPress={() => setPage((value) => Math.min(value + 1, totalPages))}>
+                <Text style={styles.pageButtonText}>다음</Text>
+              </TouchableOpacity>
+            </View>
           ) : null
         }
       />
@@ -195,11 +259,19 @@ const styles = StyleSheet.create({
   addButton: { backgroundColor: '#2563EB', paddingHorizontal: 15, paddingVertical: 10, borderRadius: 12 },
   addButtonText: { color: '#FFFFFF', fontWeight: '900' },
   list: { padding: 18, paddingTop: 8, paddingBottom: 32 },
+  searchInput: { borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 12, padding: 12, backgroundColor: '#FFFFFF', color: '#0F172A', marginBottom: 10 },
   filterRow: { flexDirection: 'row', gap: 8, marginBottom: 10 },
   filterChip: { borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: '#FFFFFF' },
   activeFilterChip: { borderColor: '#2563EB', backgroundColor: '#EFF6FF' },
   filterChipText: { color: '#475569', fontSize: 12, fontWeight: '800' },
   activeFilterChipText: { color: '#2563EB' },
+  sortRow: { flexDirection: 'row', gap: 8, marginBottom: 10 },
+  sortChip: { flex: 1, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 12, paddingVertical: 10, alignItems: 'center', backgroundColor: '#FFFFFF' },
+  activeSortChip: { borderColor: '#2563EB', backgroundColor: '#EFF6FF' },
+  sortChipText: { color: '#475569', fontWeight: '900' },
+  activeSortChipText: { color: '#2563EB' },
+  pageHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  pageHint: { color: '#64748B', fontSize: 12, fontWeight: '800' },
   card: { backgroundColor: '#FFFFFF', borderRadius: 18, padding: 16, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 12 },
   cardHead: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 },
   cardTitleWrap: { flex: 1 },
@@ -215,6 +287,12 @@ const styles = StyleSheet.create({
   emptyText: { marginTop: 8, color: '#64748B' },
   primaryButton: { backgroundColor: '#2563EB', borderRadius: 14, paddingVertical: 13, paddingHorizontal: 18, marginTop: 18 },
   primaryButtonText: { color: '#FFFFFF', fontWeight: '900' },
-  moreButton: { padding: 14, alignItems: 'center' },
-  moreButtonText: { color: '#2563EB', fontWeight: '900' },
+  pagination: { flexDirection: 'row', gap: 8, marginTop: 4, alignItems: 'center', justifyContent: 'center' },
+  pageButton: { flex: 1, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 12, paddingVertical: 12, alignItems: 'center', backgroundColor: '#FFFFFF' },
+  pageButtonText: { color: '#0F172A', fontWeight: '900' },
+  pageNumberButton: { minWidth: 36, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 10, paddingVertical: 9, paddingHorizontal: 8, alignItems: 'center', backgroundColor: '#FFFFFF' },
+  activePageNumberButton: { borderColor: '#2563EB', backgroundColor: '#2563EB' },
+  pageNumberText: { color: '#475569', fontWeight: '900', fontSize: 12 },
+  activePageNumberText: { color: '#FFFFFF' },
+  disabledButton: { opacity: 0.55 },
 });

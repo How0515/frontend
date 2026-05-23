@@ -41,7 +41,7 @@ export default function OrganizerProfilePage({ navigation }: any) {
     try {
       const [me, myEventsPage] = await Promise.all([
         backendApi.getMe(),
-        backendApi.getMyEvents({ page: 0, size: 8 }),
+        backendApi.getMyEvents({ page: 0, size: 100 }),
       ]);
 
       const myEvents = sortEvents(myEventsPage.items ?? []);
@@ -93,10 +93,7 @@ export default function OrganizerProfilePage({ navigation }: any) {
 
   const activeEvents = useMemo(() => events.filter((event) => event.status === 'ACTIVE').length, [events]);
   const soldTotal = useMemo(() => events.reduce((sum, event) => sum + (event.soldTicketCount ?? 0), 0), [events]);
-  const checkInTotal = useMemo(
-    () => events.reduce((sum, event) => sum + (checkInCountByEventId[event.id] ?? event.checkInCount ?? 0), 0),
-    [checkInCountByEventId, events],
-  );
+  const checkInTotal = useMemo(() => events.reduce((sum, event) => sum + (checkInCountByEventId[event.id] ?? 0), 0), [checkInCountByEventId, events]);
 
   if (loading) {
     return (
@@ -115,38 +112,10 @@ export default function OrganizerProfilePage({ navigation }: any) {
     >
       <Text style={styles.eyebrow}>My Profile</Text>
       <Text style={styles.title}>내 정보</Text>
-      <Text style={styles.subtitle}>계정 관리와 내 운영 이벤트 상태를 한 화면에서 확인합니다.</Text>
-
-      <View style={styles.metricGrid}>
-        <Metric label="운영중 이벤트" value={activeEvents} />
-        <Metric label="총 판매량" value={soldTotal} />
-        <Metric label="총 체크인" value={checkInTotal} />
-      </View>
+      <Text style={styles.subtitle}>계정 관리가 우선이고, 아래에서 운영 요약을 이어서 확인합니다.</Text>
 
       <View style={styles.avatar}>
         <Text style={styles.avatarText}>{(profile?.displayName || profile?.email || 'O').slice(0, 1).toUpperCase()}</Text>
-      </View>
-
-      <View style={styles.card}>
-        <View style={styles.sectionHead}>
-          <Text style={styles.cardTitle}>내 운영 이벤트 요약</Text>
-          <Text style={styles.sectionHint}>{events.length}건</Text>
-        </View>
-        {events.length === 0 ? (
-          <Text style={styles.emptyText}>운영 중인 이벤트가 없습니다.</Text>
-        ) : (
-          events.map((event) => (
-            <TouchableOpacity key={event.id} style={styles.eventCard} onPress={() => navigation.navigate('OrganizerEventDetail', { eventId: event.id })}>
-              <Text style={styles.eventTitle}>{eventTitle(event)}</Text>
-              <Text style={styles.eventMeta}>장소 {event.venue || '-'}</Text>
-              <Text style={styles.eventMeta}>일시 {formatEventDate(event.eventAt || event.eventDateTime)}</Text>
-              <View style={styles.eventFoot}>
-                <Text style={styles.badge}>{formatEventStatus(event.status)}</Text>
-                <Text style={styles.eventCount}>판매 {event.soldTicketCount ?? 0} · 체크인 {checkInCountByEventId[event.id] ?? event.checkInCount ?? 0}</Text>
-              </View>
-            </TouchableOpacity>
-          ))
-        )}
       </View>
 
       <View style={styles.card}>
@@ -168,6 +137,36 @@ export default function OrganizerProfilePage({ navigation }: any) {
       <TouchableOpacity style={styles.logoutButton} onPress={() => navigation.navigate('OrganizerLogout')}>
         <Text style={styles.logoutButtonText}>로그아웃</Text>
       </TouchableOpacity>
+
+      <View style={styles.metricGrid}>
+        <Metric label="운영중 이벤트" value={activeEvents} />
+        <Metric label="총 판매량" value={soldTotal} />
+        <Metric label="총 체크인" value={checkInTotal} />
+      </View>
+
+      <View style={styles.card}>
+        <View style={styles.sectionHead}>
+          <Text style={styles.cardTitle}>내 운영 이벤트 미리보기</Text>
+          <TouchableOpacity onPress={() => navigation.navigate('MyEvents')}>
+            <Text style={styles.linkText}>전체 보기</Text>
+          </TouchableOpacity>
+        </View>
+        {events.length === 0 ? (
+          <Text style={styles.emptyText}>운영 중인 이벤트가 없습니다.</Text>
+        ) : (
+          events.slice(0, 5).map((event) => (
+            <TouchableOpacity key={event.id} style={styles.eventCard} onPress={() => navigation.navigate('OrganizerEventDetail', { eventId: event.id })}>
+              <Text style={styles.eventTitle}>{eventTitle(event)}</Text>
+              <Text style={styles.eventMeta}>장소 {event.venue || '-'}</Text>
+              <Text style={styles.eventMeta}>일시 {formatEventDate(event.eventAt || event.eventDateTime)}</Text>
+              <View style={styles.eventFoot}>
+                <Text style={styles.badge}>{formatEventStatus(event.status)}</Text>
+                <Text style={styles.eventCount}>판매 {event.soldTicketCount ?? 0} · 체크인 {checkInCountByEventId[event.id] ?? 0}</Text>
+              </View>
+            </TouchableOpacity>
+          ))
+        )}
+      </View>
     </ScrollView>
   );
 }
@@ -199,6 +198,7 @@ const styles = StyleSheet.create({
   sectionHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
   sectionHint: { color: '#64748B', fontSize: 12, fontWeight: '800' },
   cardTitle: { color: '#0F172A', fontSize: 17, fontWeight: '900' },
+  linkText: { color: '#2563EB', fontWeight: '900', fontSize: 12 },
   eventCard: { borderTopWidth: 1, borderTopColor: '#F1F5F9', paddingTop: 12, paddingBottom: 12 },
   eventTitle: { color: '#0F172A', fontWeight: '900', fontSize: 15 },
   eventMeta: { marginTop: 4, color: '#64748B', fontSize: 12 },

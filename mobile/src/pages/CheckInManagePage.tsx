@@ -3,8 +3,8 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Alert, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { errorMessage } from '../lib/account';
 import { backendApi } from '../lib/backend';
-import { formatTicketEntryStatus } from '../lib/ticketDisplay';
-import type { TicketDetail } from '../types/api';
+import { formatEventDate, formatEventStatus, formatTicketEntryStatus } from '../lib/ticketDisplay';
+import type { EventDetail, TicketDetail } from '../types/api';
 
 type QrPayload = {
   ticketId?: string;
@@ -71,6 +71,7 @@ export default function CheckInManagePage({ navigation, route }: any) {
   const [refreshing, setRefreshing] = useState(false);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [ticket, setTicket] = useState<TicketDetail | null>(null);
+  const [event, setEvent] = useState<EventDetail | null>(null);
 
   const hasQrInfo = Boolean(ticketId.trim() && claimedOwner.trim() && expiresAt.trim() && signature.trim());
   const expired = useMemo(() => {
@@ -88,6 +89,8 @@ export default function CheckInManagePage({ navigation, route }: any) {
 
   const load = useCallback(async () => {
     try {
+      const eventDetail = await backendApi.getEvent(eventId).catch(() => null);
+      setEvent(eventDetail);
       const data = await backendApi.getEventValidators(eventId).catch(() => []);
       setValidators(data);
     } catch (error: any) {
@@ -207,7 +210,15 @@ export default function CheckInManagePage({ navigation, route }: any) {
     >
       <Text style={styles.eyebrow}>Check-in Manage</Text>
       <Text style={styles.title}>체크인 관리</Text>
-      <Text style={styles.subtitle}>QR을 스캔하면 입장 처리 정보가 자동으로 반영됩니다.</Text>
+      <Text style={styles.subtitle}>선택된 이벤트의 QR을 검증하고 실제 입장 처리를 진행합니다.</Text>
+
+      <View style={styles.eventBanner}>
+        <Text style={styles.eventBannerEyebrow}>선택된 이벤트</Text>
+        <Text style={styles.eventBannerTitle}>{event?.name || event?.title || '이벤트를 불러오는 중'}</Text>
+        <Text style={styles.eventBannerMeta}>장소 {event?.venue || '-'}</Text>
+        <Text style={styles.eventBannerMeta}>일시 {formatEventDate(event?.eventAt || event?.eventDateTime)}</Text>
+        <Text style={styles.eventBannerStatus}>{formatEventStatus(event?.status)}</Text>
+      </View>
 
       {feedback ? (
         <View style={[styles.messageBox, feedback.type === 'error' ? styles.errorBox : styles.infoBox]}>
@@ -298,6 +309,11 @@ const styles = StyleSheet.create({
   eyebrow: { color: '#2563EB', fontWeight: '800', fontSize: 12 },
   title: { marginTop: 4, fontSize: 28, fontWeight: '900', color: '#0F172A' },
   subtitle: { marginTop: 8, color: '#64748B', fontSize: 14, lineHeight: 21 },
+  eventBanner: { marginTop: 14, borderRadius: 16, padding: 14, backgroundColor: '#EFF6FF', borderWidth: 1, borderColor: '#BFDBFE' },
+  eventBannerEyebrow: { color: '#2563EB', fontSize: 11, fontWeight: '900', letterSpacing: 0.4 },
+  eventBannerTitle: { marginTop: 4, color: '#0F172A', fontSize: 18, fontWeight: '900' },
+  eventBannerMeta: { marginTop: 4, color: '#1E3A8A', fontSize: 12, fontWeight: '800' },
+  eventBannerStatus: { marginTop: 8, color: '#0369A1', fontSize: 12, fontWeight: '900' },
   messageBox: { marginTop: 14, borderRadius: 12, padding: 12, borderWidth: 1 },
   infoBox: { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE' },
   errorBox: { backgroundColor: '#FEF2F2', borderColor: '#FECACA' },

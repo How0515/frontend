@@ -102,19 +102,19 @@ export default function CheckInHomePage({ navigation }: any) {
     >
       <Text style={styles.eyebrow}>Check-in Home</Text>
       <Text style={styles.title}>체크인</Text>
-      <Text style={styles.subtitle}>QR 스캔부터 검증, 입장 처리까지 운영 흐름대로 진행하세요.</Text>
+      <Text style={styles.subtitle}>체크인할 이벤트를 먼저 고르고, 이후 실제 입장 처리는 관리 화면에서 진행하세요.</Text>
 
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>빠른 QR 스캔</Text>
+        <Text style={styles.cardTitle}>이벤트 선택</Text>
         <Text style={styles.cardText}>
-          {quickEvent ? `${eventTitle(quickEvent)} 체크인을 바로 시작할 수 있습니다.` : '운영중인 이벤트가 없습니다.'}
+          {quickEvent ? `${eventTitle(quickEvent)} 체크인을 바로 이어서 진행할 수 있습니다.` : '운영중인 이벤트가 없습니다.'}
         </Text>
         <TouchableOpacity
           style={[styles.primaryButton, !quickEvent && styles.disabledButton]}
           disabled={!quickEvent}
-          onPress={() => navigation.navigate('CheckInScan', { eventId: quickEvent?.id })}
+          onPress={() => navigation.navigate('CheckInManage', { eventId: quickEvent?.id })}
         >
-          <Text style={styles.primaryButtonText}>QR 스캔 시작</Text>
+          <Text style={styles.primaryButtonText}>입장 처리</Text>
         </TouchableOpacity>
       </View>
 

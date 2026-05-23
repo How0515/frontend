@@ -1,12 +1,23 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
-import { ActivityIndicator, Alert, FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { errorMessage } from '../lib/account';
 import { backendApi } from '../lib/backend';
 import { formatEventDate } from '../lib/ticketDisplay';
 import type { CheckInRecord, TicketDetail } from '../types/api';
 
 const PAGE_SIZE = 20;
+const MAX_VISIBLE_PAGES = 4;
+const RESULT_FILTERS = [
+  { value: 'ALL', label: '전체' },
+  { value: 'SUCCESS', label: '입장 완료' },
+  { value: 'FAILED', label: '입장 실패' },
+  { value: 'PENDING', label: '확인 필요' },
+] as const;
+const SORT_MODES = [
+  { value: 'latest', label: '최신순' },
+  { value: 'oldest', label: '오래된순' },
+] as const;
 
 function ticketId(ticket: TicketDetail) {
   return String(ticket.id ?? ticket.ticketId ?? '');
@@ -25,7 +36,10 @@ export default function CheckInStatusPage({ route }: any) {
   const [records, setRecords] = useState<CheckInRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [page, setPage] = useState(0);
+  const [page, setPage] = useState(1);
+  const [query, setQuery] = useState('');
+  const [selectedResult, setSelectedResult] = useState<(typeof RESULT_FILTERS)[number]['value']>('ALL');
+  const [sortMode, setSortMode] = useState<(typeof SORT_MODES)[number]['value']>('latest');
 
   const load = useCallback(async () => {
     try {
@@ -33,7 +47,7 @@ export default function CheckInStatusPage({ route }: any) {
       const histories = await Promise.all(eventTickets.map((ticket) => backendApi.getTicketCheckIns(ticketId(ticket)).catch(() => [])));
       setTickets(eventTickets);
       setRecords(histories.flat());
-      setPage(0);
+      setPage(1);
     } catch (error: any) {
       Alert.alert('체크인 현황 로드 실패', errorMessage(error, '체크인 현황을 불러오지 못했습니다.'));
     } finally {
@@ -46,8 +60,36 @@ export default function CheckInStatusPage({ route }: any) {
 
   const used = tickets.filter((ticket) => ticket.status === 'USED').length;
   const success = records.filter((record) => record.result === 'SUCCESS' || record.status === 'SUCCESS').length;
-  const totalPages = Math.max(1, Math.ceil(records.length / PAGE_SIZE));
-  const pagedRecords = useMemo(() => records.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE), [page, records]);
+  const filteredRecords = useMemo(() => {
+    const normalized = query.trim().toLowerCase();
+    const base = records.filter((record) => {
+      const ticketMatch = String(record.ticketId || '').toLowerCase();
+      const memoMatch = String(record.memo || '').toLowerCase();
+      const haystack = `${ticketMatch} ${memoMatch}`;
+      const matchesQuery = !normalized || haystack.includes(normalized);
+      const resultKey = String(record.result || record.status || '').toUpperCase();
+      const matchesResult = selectedResult === 'ALL' || resultKey === selectedResult || (selectedResult === 'PENDING' && !record.result && !record.status);
+      return matchesQuery && matchesResult;
+    });
+
+    return [...base].sort((a, b) => {
+      const aTime = new Date(a.checkedInAt || a.createdAt || '').getTime();
+      const bTime = new Date(b.checkedInAt || b.createdAt || '').getTime();
+      return sortMode === 'latest'
+        ? (Number.isNaN(bTime) ? 0 : bTime) - (Number.isNaN(aTime) ? 0 : aTime)
+        : (Number.isNaN(aTime) ? 0 : aTime) - (Number.isNaN(bTime) ? 0 : bTime);
+    });
+  }, [query, records, selectedResult, sortMode]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredRecords.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const pagedRecords = useMemo(() => filteredRecords.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE), [currentPage, filteredRecords]);
+  const pageNumbers = useMemo(() => {
+    const half = Math.floor(MAX_VISIBLE_PAGES / 2);
+    const start = Math.max(1, Math.min(currentPage - half, totalPages - MAX_VISIBLE_PAGES + 1));
+    const end = Math.min(totalPages, start + MAX_VISIBLE_PAGES - 1);
+    return Array.from({ length: end - start + 1 }, (_, index) => start + index);
+  }, [currentPage, totalPages]);
 
   if (loading) {
     return <View style={styles.center}><ActivityIndicator size="large" color="#2563EB" /></View>;
@@ -71,7 +113,41 @@ export default function CheckInStatusPage({ route }: any) {
           </View>
           <View style={styles.sectionHead}>
             <Text style={styles.sectionTitle}>체크인 기록</Text>
-            <Text style={styles.pageText}>{page + 1} / {totalPages}</Text>
+            <Text style={styles.pageText}>{currentPage} / {totalPages}</Text>
+          </View>
+          <TextInput
+            style={styles.input}
+            value={query}
+            onChangeText={(value) => {
+              setQuery(value);
+              setPage(1);
+            }}
+            placeholder="티켓 ID, 메모 검색"
+            returnKeyType="search"
+          />
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterList}>
+            {RESULT_FILTERS.map((item) => (
+              <TouchableOpacity
+                key={item.value}
+                style={[styles.filterChip, selectedResult === item.value && styles.activeFilterChip]}
+                onPress={() => {
+                  setSelectedResult(item.value);
+                  setPage(1);
+                }}
+              >
+                <Text style={[styles.filterChipText, selectedResult === item.value && styles.activeFilterChipText]}>{item.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+          <View style={styles.sortRow}>
+            {SORT_MODES.map((item) => (
+              <TouchableOpacity key={item.value} style={[styles.sortChip, sortMode === item.value && styles.activeSortChip]} onPress={() => { setSortMode(item.value); setPage(1); }}>
+                <Text style={[styles.sortChipText, sortMode === item.value && styles.activeSortChipText]}>{item.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <View style={styles.pageHead}>
+            <Text style={styles.pageHint}>검색 결과 {filteredRecords.length}건</Text>
           </View>
         </>
       }
@@ -82,14 +158,19 @@ export default function CheckInStatusPage({ route }: any) {
           {item.memo ? <Text style={styles.rowMemo}>{item.memo}</Text> : null}
         </View>
       )}
-      ListEmptyComponent={<Text style={styles.emptyText}>체크인 기록이 없습니다.</Text>}
+      ListEmptyComponent={<Text style={styles.emptyText}>조건에 맞는 체크인 기록이 없습니다.</Text>}
       ListFooterComponent={
-        records.length > PAGE_SIZE ? (
+        filteredRecords.length > PAGE_SIZE ? (
           <View style={styles.pagination}>
-            <TouchableOpacity style={[styles.pageButton, page === 0 && styles.disabledButton]} disabled={page === 0} onPress={() => setPage((value) => Math.max(value - 1, 0))}>
+            <TouchableOpacity style={[styles.pageButton, currentPage === 1 && styles.disabledButton]} disabled={currentPage === 1} onPress={() => setPage((value) => Math.max(value - 1, 1))}>
               <Text style={styles.pageButtonText}>이전</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.pageButton, page >= totalPages - 1 && styles.disabledButton]} disabled={page >= totalPages - 1} onPress={() => setPage((value) => Math.min(value + 1, totalPages - 1))}>
+            {pageNumbers.map((pageNumber) => (
+              <TouchableOpacity key={pageNumber} style={[styles.pageNumberButton, currentPage === pageNumber && styles.activePageNumberButton]} onPress={() => setPage(pageNumber)}>
+                <Text style={[styles.pageNumberText, currentPage === pageNumber && styles.activePageNumberText]}>{pageNumber}</Text>
+              </TouchableOpacity>
+            ))}
+            <TouchableOpacity style={[styles.pageButton, currentPage >= totalPages && styles.disabledButton]} disabled={currentPage >= totalPages} onPress={() => setPage((value) => Math.min(value + 1, totalPages))}>
               <Text style={styles.pageButtonText}>다음</Text>
             </TouchableOpacity>
           </View>
@@ -116,13 +197,30 @@ const styles = StyleSheet.create({
   sectionHead: { marginTop: 18, marginBottom: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   sectionTitle: { color: '#0F172A', fontSize: 17, fontWeight: '900' },
   pageText: { color: '#64748B', fontSize: 12, fontWeight: '800' },
+  input: { borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 12, padding: 12, backgroundColor: '#FFFFFF', color: '#0F172A' },
+  filterList: { gap: 8, marginTop: 10, paddingBottom: 8 },
+  filterChip: { borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: '#FFFFFF' },
+  activeFilterChip: { borderColor: '#2563EB', backgroundColor: '#EFF6FF' },
+  filterChipText: { color: '#475569', fontWeight: '800', fontSize: 12 },
+  activeFilterChipText: { color: '#2563EB' },
+  sortRow: { flexDirection: 'row', gap: 8, marginTop: 2, marginBottom: 10 },
+  sortChip: { flex: 1, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 12, paddingVertical: 10, alignItems: 'center', backgroundColor: '#FFFFFF' },
+  activeSortChip: { borderColor: '#2563EB', backgroundColor: '#EFF6FF' },
+  sortChipText: { color: '#475569', fontWeight: '900' },
+  activeSortChipText: { color: '#2563EB' },
+  pageHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  pageHint: { color: '#64748B', fontSize: 12, fontWeight: '800' },
   row: { backgroundColor: '#FFFFFF', borderRadius: 14, padding: 14, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 10 },
   rowTitle: { color: '#0F172A', fontWeight: '900' },
   rowMeta: { marginTop: 4, color: '#64748B', fontSize: 12 },
   rowMemo: { marginTop: 8, color: '#334155', fontSize: 13, lineHeight: 18 },
-  pagination: { flexDirection: 'row', gap: 8, marginTop: 4 },
+  pagination: { flexDirection: 'row', gap: 8, marginTop: 4, alignItems: 'center', justifyContent: 'center' },
   pageButton: { flex: 1, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 12, paddingVertical: 12, alignItems: 'center', backgroundColor: '#FFFFFF' },
   pageButtonText: { color: '#0F172A', fontWeight: '900' },
+  pageNumberButton: { minWidth: 36, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 10, paddingVertical: 9, paddingHorizontal: 8, alignItems: 'center', backgroundColor: '#FFFFFF' },
+  activePageNumberButton: { borderColor: '#2563EB', backgroundColor: '#2563EB' },
+  pageNumberText: { color: '#475569', fontWeight: '900', fontSize: 12 },
+  activePageNumberText: { color: '#FFFFFF' },
   disabledButton: { opacity: 0.55 },
   emptyText: { color: '#94A3B8', paddingVertical: 48, textAlign: 'center' },
 });

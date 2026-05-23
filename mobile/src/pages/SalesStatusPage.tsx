@@ -8,6 +8,14 @@ import type { EventDetail, TicketDetail } from '../types/api';
 
 const PAGE_SIZE = 20;
 const MAX_VISIBLE_PAGES = 4;
+const STATUS_FILTERS = [
+  { value: 'ALL', label: '전체' },
+  { value: 'AVAILABLE', label: '예매 가능' },
+  { value: 'LISTED', label: '판매중' },
+  { value: 'SOLD', label: '판매완료' },
+  { value: 'USED', label: '사용완료' },
+  { value: 'CANCELED', label: '취소됨' },
+] as const;
 
 function seatSectionOf(seatInfo?: string) {
   const normalized = String(seatInfo ?? '').trim().toUpperCase();
@@ -37,6 +45,7 @@ export default function SalesStatusPage({ route }: any) {
   const [page, setPage] = useState(1);
   const [seatQuery, setSeatQuery] = useState('');
   const [selectedSeatSection, setSelectedSeatSection] = useState('전체');
+  const [selectedStatus, setSelectedStatus] = useState<(typeof STATUS_FILTERS)[number]['value']>('ALL');
   const [sortMode, setSortMode] = useState<'latest' | 'seat'>('latest');
 
   const load = useCallback(async () => {
@@ -73,14 +82,15 @@ export default function SalesStatusPage({ route }: any) {
     const base = tickets.filter((ticket) => {
       const seatInfo = String(ticket.seatInfo || '').toUpperCase();
       const matchesSection = selectedSeatSection === '전체' || seatSectionOf(ticket.seatInfo) === selectedSeatSection;
+      const matchesStatus = selectedStatus === 'ALL' || String(ticket.status).toUpperCase() === selectedStatus;
       const matchesQuery = !query || seatInfo.includes(query);
-      return matchesSection && matchesQuery;
+      return matchesSection && matchesStatus && matchesQuery;
     });
     return [...base].sort((a, b) => {
       if (sortMode === 'seat') return String(a.seatInfo || '').localeCompare(String(b.seatInfo || ''), 'ko-KR', { numeric: true });
       return new Date(b.createdAt || '').getTime() - new Date(a.createdAt || '').getTime();
     });
-  }, [seatQuery, selectedSeatSection, sortMode, tickets]);
+  }, [seatQuery, selectedSeatSection, selectedStatus, sortMode, tickets]);
 
   const totalPages = Math.max(1, Math.ceil(filteredTickets.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
@@ -143,6 +153,20 @@ export default function SalesStatusPage({ route }: any) {
                 }}
               >
                 <Text style={[styles.filterChipText, selectedSeatSection === section && styles.activeFilterChipText]}>{section}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterList}>
+            {STATUS_FILTERS.map((item) => (
+              <TouchableOpacity
+                key={item.value}
+                style={[styles.filterChip, selectedStatus === item.value && styles.activeFilterChip]}
+                onPress={() => {
+                  setSelectedStatus(item.value);
+                  setPage(1);
+                }}
+              >
+                <Text style={[styles.filterChipText, selectedStatus === item.value && styles.activeFilterChipText]}>{item.label}</Text>
               </TouchableOpacity>
             ))}
           </ScrollView>
