@@ -195,8 +195,8 @@ export default function OrganizerDashboardPage({ navigation }: any) {
         <>
           <View style={styles.metricGrid}>
             <Metric label="내 이벤트" value={events.length} />
-            <Metric label="운영중" value={activeEvents} />
-            <Metric label="판매 완료" value={soldTickets} />
+            <Metric label="운영중 이벤트" value={activeEvents} />
+            <Metric label="판매 완료 티켓" value={soldTickets} />
           </View>
 
           <View style={styles.actions}>
