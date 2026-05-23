@@ -125,7 +125,7 @@ export default function CheckInHomePage({ navigation }: any) {
             const highlighted = event.id === recentEventId;
 
             return (
-            <View key={event.id} style={styles.eventRow}>
+            <View key={event.id} style={styles.eventCard}>
               <View style={styles.eventInfo}>
                 <Text style={styles.eventTitle}>{eventTitle(event)}</Text>
                 <Text style={styles.eventMeta}>장소 {event.venue || '-'}</Text>
@@ -133,11 +133,11 @@ export default function CheckInHomePage({ navigation }: any) {
               </View>
               <View style={styles.eventActions}>
                 <Text style={styles.badge}>{formatEventStatus(event.status)}</Text>
-                <TouchableOpacity style={[styles.rowButton, highlighted && styles.primaryRowButton]} onPress={() => navigation.navigate('CheckInManage', { eventId: event.id })}>
+                <TouchableOpacity style={[styles.rowButton, styles.primaryActionButton, highlighted && styles.primaryRowButton]} onPress={() => navigation.navigate('CheckInManage', { eventId: event.id })}>
                   <Text style={styles.rowButtonText}>입장 처리</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.rowButton} onPress={() => navigation.navigate('CheckInStatus', { eventId: event.id })}>
-                  <Text style={styles.rowButtonText}>체크인 현황</Text>
+                  <Text style={styles.secondaryRowButtonText}>체크인 현황</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -188,14 +188,17 @@ const styles = StyleSheet.create({
   sectionHint: { color: '#64748B', fontSize: 12, fontWeight: '800' },
   emptyText: { color: '#94A3B8', paddingVertical: 16, textAlign: 'center' },
   eventRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, paddingVertical: 12, borderTopWidth: 1, borderTopColor: '#F1F5F9' },
+  eventCard: { marginTop: 10, borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 14, padding: 12, backgroundColor: '#FFFFFF', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
   checkInRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, paddingVertical: 12, borderTopWidth: 1, borderTopColor: '#F1F5F9' },
   eventInfo: { flex: 1 },
   eventTitle: { color: '#0F172A', fontWeight: '900', fontSize: 14 },
   eventMeta: { marginTop: 4, color: '#64748B', fontSize: 12 },
   eventActions: { alignItems: 'flex-end', gap: 8 },
   badge: { overflow: 'hidden', borderRadius: 999, backgroundColor: '#E0F2FE', color: '#0369A1', paddingHorizontal: 9, paddingVertical: 5, fontSize: 11, fontWeight: '900' },
-  rowButton: { borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8, backgroundColor: '#FFFFFF' },
+  rowButton: { borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8, backgroundColor: '#FFFFFF', minWidth: 92, alignItems: 'center' },
+  primaryActionButton: { borderColor: '#2563EB', backgroundColor: '#2563EB' },
   primaryRowButton: { borderColor: '#2563EB', backgroundColor: '#EFF6FF' },
-  rowButtonText: { color: '#0F172A', fontWeight: '900', fontSize: 12 },
+  rowButtonText: { color: '#FFFFFF', fontWeight: '900', fontSize: 12 },
+  secondaryRowButtonText: { color: '#0F172A', fontWeight: '900', fontSize: 12 },
   linkText: { color: '#2563EB', fontWeight: '900', fontSize: 12 },
 });

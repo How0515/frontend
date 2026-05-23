@@ -3,7 +3,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { ActivityIndicator, Alert, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { errorMessage } from '../lib/account';
 import { backendApi } from '../lib/backend';
-import { formatEventDate, formatTicketStatus } from '../lib/ticketDisplay';
+import { formatEventDate, formatEventStatus, formatTicketStatus } from '../lib/ticketDisplay';
 import type { EventDetail, EventSummary, TicketDetail } from '../types/api';
 
 function ticketId(ticket: TicketDetail) {
@@ -89,14 +89,20 @@ export default function SalesStatusPage({ navigation, route }: any) {
             events.slice(0, 10).map((item) => (
               <TouchableOpacity
                 key={item.id}
-                style={styles.eventRow}
+                style={styles.selectionCard}
                 onPress={() => navigation.navigate('SalesStatus', { eventId: item.id })}
               >
-                <View style={styles.rowInfo}>
+                <View style={styles.selectionHeader}>
                   <Text style={styles.rowTitle}>{eventTitle(item)}</Text>
+                  <Text style={styles.badge}>{formatEventStatus(item.status)}</Text>
+                </View>
+                <View style={styles.rowInfo}>
+                  <Text style={styles.rowMeta}>장소 {item.venue || '-'}</Text>
                   <Text style={styles.rowMeta}>일시 {formatEventDate(item.eventAt || item.eventDateTime)}</Text>
                 </View>
-                <Text style={styles.linkText}>선택</Text>
+                <TouchableOpacity style={styles.selectButton} onPress={() => navigation.navigate('SalesStatus', { eventId: item.id })}>
+                  <Text style={styles.selectButtonText}>선택</Text>
+                </TouchableOpacity>
               </TouchableOpacity>
             ))
           )}
@@ -165,9 +171,13 @@ const styles = StyleSheet.create({
   sectionTitle: { color: '#0F172A', fontSize: 17, fontWeight: '900' },
   linkText: { color: '#2563EB', fontWeight: '900', fontSize: 12 },
   eventRow: { borderTopWidth: 1, borderTopColor: '#F1F5F9', paddingVertical: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  selectionCard: { borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 14, padding: 12, backgroundColor: '#FFFFFF', marginTop: 10 },
+  selectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   rowInfo: { flex: 1 },
   rowTitle: { color: '#0F172A', fontWeight: '900' },
   rowMeta: { marginTop: 4, color: '#64748B', fontSize: 12 },
+  selectButton: { marginTop: 10, borderRadius: 10, backgroundColor: '#2563EB', alignSelf: 'flex-end', paddingHorizontal: 14, paddingVertical: 8 },
+  selectButtonText: { color: '#FFFFFF', fontSize: 12, fontWeight: '900' },
   badge: { overflow: 'hidden', borderRadius: 999, backgroundColor: '#E0F2FE', color: '#0369A1', paddingHorizontal: 9, paddingVertical: 5, fontSize: 11, fontWeight: '900' },
   emptyText: { color: '#94A3B8', paddingVertical: 24, textAlign: 'center' },
 });

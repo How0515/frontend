@@ -59,9 +59,12 @@ export default function OrganizerDashboardPage({ navigation }: any) {
   const latestStatus = latestApplication?.status ?? null;
   const canApply = !latestApplication || latestStatus === 'REJECTED';
   const activeEvents = events.filter((event) => event.status === 'ACTIVE').length;
-  const soldTickets = events.reduce((sum, event) => sum + (event.soldTicketCount ?? 0), 0);
-  const listedTickets = events.reduce((sum, event) => sum + Number((event as any).listedTicketCount ?? 0), 0);
-  const checkedInTickets = events.reduce((sum, event) => sum + Number((event as any).checkInCount ?? 0), 0);
+  const [ticketMetrics, setTicketMetrics] = useState({
+    sellingTickets: 0,
+    soldTickets: 0,
+    listedTickets: 0,
+    checkedInTickets: 0,
+  });
 
   const load = useCallback(async () => {
     try {
@@ -74,9 +77,23 @@ export default function OrganizerDashboardPage({ navigation }: any) {
 
       if (me.roles?.includes('ORGANIZER') || me.roles?.includes('ADMIN')) {
         const eventPage = await backendApi.getMyEvents({ page: 0, size: 5 });
-        setEvents(sortCanceledLast(eventPage.items ?? []));
+        const myEvents = sortCanceledLast(eventPage.items ?? []);
+        setEvents(myEvents);
+
+        const ticketLists = await Promise.all(
+          myEvents.map((event) => backendApi.getEventTickets(event.id).catch(() => [])),
+        );
+        const allTickets = ticketLists.flat();
+
+        setTicketMetrics({
+          sellingTickets: allTickets.filter((ticket) => ticket.status === 'AVAILABLE').length,
+          soldTickets: allTickets.filter((ticket) => ticket.status === 'SOLD' || ticket.status === 'USED').length,
+          listedTickets: allTickets.filter((ticket) => ticket.status === 'LISTED').length,
+          checkedInTickets: allTickets.filter((ticket) => ticket.status === 'USED').length,
+        });
       } else {
         setEvents([]);
+        setTicketMetrics({ sellingTickets: 0, soldTickets: 0, listedTickets: 0, checkedInTickets: 0 });
       }
     } catch (error: any) {
       Alert.alert('주최자 정보 로드 실패', errorMessage(error, '로그인이 필요합니다.'));
@@ -193,14 +210,14 @@ export default function OrganizerDashboardPage({ navigation }: any) {
       ) : (
         <>
           <View style={styles.metricGrid}>
-            <Metric label="내 이벤트" value={events.length} />
+            <Metric label="총 이벤트" value={events.length} />
             <Metric label="운영중 이벤트" value={activeEvents} />
-            <Metric label="판매 완료 티켓" value={soldTickets} />
+            <Metric label="판매 중 티켓" value={ticketMetrics.sellingTickets} />
           </View>
           <View style={[styles.metricGrid, { marginTop: 8 }]}> 
-            <Metric label="리셀중 티켓" value={listedTickets} />
-            <Metric label="체크인 완료 티켓" value={checkedInTickets} />
-            <View style={styles.metricCard} />
+            <Metric label="판매 완료 티켓" value={ticketMetrics.soldTickets} />
+            <Metric label="리셀 중 티켓" value={ticketMetrics.listedTickets} />
+            <Metric label="체크인 완료 티켓" value={ticketMetrics.checkedInTickets} />
           </View>
 
           <View style={styles.actions}>
