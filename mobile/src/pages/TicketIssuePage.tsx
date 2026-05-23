@@ -13,9 +13,11 @@ import {
 } from 'react-native';
 import { accountStatusMessage, errorMessage } from '../lib/account';
 import { backendApi } from '../lib/backend';
+import { formatTicketStatus } from '../lib/ticketDisplay';
 import type { EventDetail, TicketDetail } from '../types/api';
 
-const SEAT_SECTIONS = ['A', 'B', 'C', 'D', 'VIP'];
+const DEFAULT_SEAT_SECTIONS = ['A', 'B', 'C', 'D', 'VIP'];
+const PAGE_SIZE = 12;
 
 function buildSeats(count: number, section: string, startNumber: number) {
   return Array.from({ length: count }, (_, index) => `${section}-${startNumber + index}`);
@@ -23,6 +25,11 @@ function buildSeats(count: number, section: string, startNumber: number) {
 
 function ticketKey(ticket: TicketDetail) {
   return String(ticket.id ?? ticket.ticketId ?? ticket.seatInfo);
+}
+
+function seatNumber(seat?: string) {
+  const value = Number(String(seat || '').split('-')[1]);
+  return Number.isFinite(value) ? value : 0;
 }
 
 function nextSeatNumber(tickets: TicketDetail[], section: string) {
@@ -41,8 +48,13 @@ export default function TicketIssuePage({ navigation, route }: any) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [issueCount, setIssueCount] = useState('10');
+  const [seatSections, setSeatSections] = useState(DEFAULT_SEAT_SECTIONS);
   const [seatSection, setSeatSection] = useState('A');
+  const [newSection, setNewSection] = useState('');
   const [startNumber, setStartNumber] = useState('1');
+  const [query, setQuery] = useState('');
+  const [sortMode, setSortMode] = useState<'latest' | 'seat'>('latest');
+  const [page, setPage] = useState(0);
   const [issuing, setIssuing] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'error' | 'success'; message: string } | null>(null);
 
@@ -65,9 +77,13 @@ export default function TicketIssuePage({ navigation, route }: any) {
         backendApi.getEvent(eventId),
         backendApi.getEventTickets(eventId).catch(() => []),
       ]);
+      const sectionsFromTickets = Array.from(new Set(issuedTickets.map((ticket) => String(ticket.seatInfo || '').split('-')[0]).filter(Boolean)));
+      const mergedSections = Array.from(new Set([...DEFAULT_SEAT_SECTIONS, ...sectionsFromTickets]));
+      setSeatSections(mergedSections);
       setEvent(eventDetail);
       setTickets(issuedTickets);
       setStartNumber(String(nextSeatNumber(issuedTickets, seatSection)));
+      setPage(0);
     } catch (error: any) {
       const message = errorMessage(error, '현재 발행 정보를 불러오지 못했습니다.');
       setFeedback({ type: 'error', message });
@@ -91,6 +107,21 @@ export default function TicketIssuePage({ navigation, route }: any) {
     return buildSeats(Math.min(count, 8), seatSection, start);
   }, [issueCount, seatSection, startNumber]);
 
+  const filteredTickets = useMemo(() => {
+    const normalized = query.trim().toLowerCase();
+    const base = normalized ? tickets.filter((ticket) => ticket.seatInfo?.toLowerCase().includes(normalized)) : tickets;
+    return [...base].sort((a, b) => {
+      if (sortMode === 'seat') {
+        const sectionCompare = String(a.seatInfo || '').localeCompare(String(b.seatInfo || ''), 'ko-KR', { numeric: true });
+        return sectionCompare || seatNumber(a.seatInfo) - seatNumber(b.seatInfo);
+      }
+      return new Date(b.createdAt || '').getTime() - new Date(a.createdAt || '').getTime();
+    });
+  }, [query, sortMode, tickets]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredTickets.length / PAGE_SIZE));
+  const pagedTickets = filteredTickets.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
+
   const setAllRemaining = () => {
     setIssueCount(String(remainingCount));
   };
@@ -98,6 +129,19 @@ export default function TicketIssuePage({ navigation, route }: any) {
   const selectSection = (section: string) => {
     setSeatSection(section);
     setStartNumber(String(nextSeatNumber(tickets, section)));
+  };
+
+  const addSection = () => {
+    const value = newSection.trim().toUpperCase();
+    if (!value) return;
+    if (seatSections.includes(value)) {
+      setNewSection('');
+      selectSection(value);
+      return;
+    }
+    setSeatSections((current) => [...current, value]);
+    setNewSection('');
+    selectSection(value);
   };
 
   const showError = (title: string, message: string) => {
@@ -136,7 +180,7 @@ export default function TicketIssuePage({ navigation, route }: any) {
     const existingSeats = new Set(tickets.map((ticket) => ticket.seatInfo));
     const duplicatedSeat = seatInfos.find((seat) => existingSeats.has(seat));
     if (duplicatedSeat) {
-      showError('좌석 중복', `${duplicatedSeat} 좌석은 이미 발행되었습니다. 시작 번호를 조정해 주세요.`);
+      showError('좌석 중복', `${duplicatedSeat} 좌석은 이미 발행되었습니다. 시작 번호를 조정해주세요.`);
       return;
     }
 
@@ -178,7 +222,7 @@ export default function TicketIssuePage({ navigation, route }: any) {
     >
       <Text style={styles.eyebrow}>Ticket Issue</Text>
       <Text style={styles.title}>티켓 발행</Text>
-      <Text style={styles.subtitle}>{event?.name || event?.title || '이벤트'}의 총 티켓 수 안에서 미발행 티켓을 생성합니다.</Text>
+      <Text style={styles.subtitle}>{event?.name || event?.title || '이벤트'}의 미발행 티켓을 좌석 단위로 생성합니다.</Text>
 
       {feedback ? (
         <View style={[styles.messageBox, feedback.type === 'success' ? styles.successBox : styles.errorBox]}>
@@ -187,31 +231,29 @@ export default function TicketIssuePage({ navigation, route }: any) {
       ) : null}
 
       <View style={styles.summaryGrid}>
-        <View style={styles.summaryCard}>
-          <Text style={styles.summaryLabel}>총 티켓</Text>
-          <Text style={styles.summaryValue}>{totalCount || '-'}</Text>
-        </View>
-        <View style={styles.summaryCard}>
-          <Text style={styles.summaryLabel}>발행 완료</Text>
-          <Text style={styles.summaryValue}>{issuedCount}</Text>
-        </View>
-        <View style={styles.summaryCard}>
-          <Text style={styles.summaryLabel}>미발행</Text>
-          <Text style={styles.summaryValue}>{remainingCount}</Text>
-        </View>
+        <Summary label="총 티켓" value={totalCount || '-'} />
+        <Summary label="발행 완료" value={issuedCount} />
+        <Summary label="미발행" value={remainingCount} />
       </View>
 
       <View style={styles.card}>
         <Text style={styles.cardTitle}>이번에 발행할 티켓</Text>
-        <Text style={styles.helpText}>총 티켓 수를 넘지 않도록 미발행 수량 안에서 발행합니다.</Text>
+        <Text style={styles.helpText}>기본 구역을 선택하거나 직접 구역을 추가할 수 있습니다.</Text>
 
         <Text style={styles.label}>좌석 구역</Text>
         <View style={styles.sectionGrid}>
-          {SEAT_SECTIONS.map((section) => (
+          {seatSections.map((section) => (
             <TouchableOpacity key={section} style={[styles.sectionChip, seatSection === section && styles.activeSectionChip]} onPress={() => selectSection(section)}>
               <Text style={[styles.sectionChipText, seatSection === section && styles.activeSectionChipText]}>{section}</Text>
             </TouchableOpacity>
           ))}
+        </View>
+
+        <View style={styles.addSectionRow}>
+          <TextInput style={[styles.input, styles.addSectionInput]} value={newSection} onChangeText={setNewSection} placeholder="FLOOR, R석 등" autoCapitalize="characters" />
+          <TouchableOpacity style={styles.addSectionButton} onPress={addSection}>
+            <Text style={styles.addSectionButtonText}>추가</Text>
+          </TouchableOpacity>
         </View>
 
         <Text style={styles.label}>시작 번호</Text>
@@ -220,9 +262,9 @@ export default function TicketIssuePage({ navigation, route }: any) {
         <Text style={styles.label}>이번 발행 수량</Text>
         <View style={styles.countRow}>
           <TextInput style={[styles.input, styles.countInput]} value={issueCount} onChangeText={setIssueCount} keyboardType="number-pad" inputMode="numeric" />
-          <TouchableOpacity style={styles.countShortcut} onPress={() => setIssueCount('1')}><Text style={styles.countShortcutText}>1장</Text></TouchableOpacity>
-          <TouchableOpacity style={styles.countShortcut} onPress={() => setIssueCount('10')}><Text style={styles.countShortcutText}>10장</Text></TouchableOpacity>
-          <TouchableOpacity style={styles.countShortcut} onPress={setAllRemaining}><Text style={styles.countShortcutText}>전체</Text></TouchableOpacity>
+          <Shortcut label="1장" onPress={() => setIssueCount('1')} />
+          <Shortcut label="10장" onPress={() => setIssueCount('10')} />
+          <Shortcut label="전체" onPress={setAllRemaining} />
         </View>
 
         <Text style={styles.previewLabel}>발행될 좌석</Text>
@@ -235,24 +277,59 @@ export default function TicketIssuePage({ navigation, route }: any) {
       </TouchableOpacity>
 
       <TouchableOpacity style={styles.secondaryButton} onPress={() => navigation.replace('OrganizerEventDetail', { eventId })}>
-        <Text style={styles.secondaryButtonText}>이벤트 관리로 이동</Text>
+        <Text style={styles.secondaryButtonText}>이벤트 운영으로 이동</Text>
       </TouchableOpacity>
 
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>최근 발행 좌석</Text>
-        {tickets.length === 0 ? (
-          <Text style={styles.emptyText}>아직 발행된 티켓이 없습니다.</Text>
+        <View style={styles.sectionHead}>
+          <Text style={styles.cardTitle}>발행 좌석 탐색</Text>
+          <Text style={styles.pageText}>{page + 1} / {totalPages}</Text>
+        </View>
+        <TextInput style={styles.input} value={query} onChangeText={(value) => { setQuery(value); setPage(0); }} placeholder="좌석 검색: A-12, VIP-3" />
+        <View style={styles.sortRow}>
+          <TouchableOpacity style={[styles.sortButton, sortMode === 'latest' && styles.activeSortButton]} onPress={() => setSortMode('latest')}>
+            <Text style={[styles.sortButtonText, sortMode === 'latest' && styles.activeSortButtonText]}>최신순</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.sortButton, sortMode === 'seat' && styles.activeSortButton]} onPress={() => setSortMode('seat')}>
+            <Text style={[styles.sortButtonText, sortMode === 'seat' && styles.activeSortButtonText]}>좌석순</Text>
+          </TouchableOpacity>
+        </View>
+
+        {pagedTickets.length === 0 ? (
+          <Text style={styles.emptyText}>조건에 맞는 발행 좌석이 없습니다.</Text>
         ) : (
-          tickets.slice(-4).reverse().map((ticket) => (
+          pagedTickets.map((ticket) => (
             <View key={ticketKey(ticket)} style={styles.ticketRow}>
-              <Text style={styles.ticketSeat}>{ticket.seatInfo}</Text>
-              <Text style={styles.ticketStatus}>{ticket.status}</Text>
+              <View>
+                <Text style={styles.ticketSeat}>{ticket.seatInfo}</Text>
+                <Text style={styles.ticketMeta}>{ticket.ownerWalletAddress || ticket.ownerAddress || '미판매'}</Text>
+              </View>
+              <Text style={styles.ticketStatus}>{formatTicketStatus(ticket.status)}</Text>
             </View>
           ))
         )}
+
+        {filteredTickets.length > PAGE_SIZE ? (
+          <View style={styles.pagination}>
+            <TouchableOpacity style={[styles.pageButton, page === 0 && styles.disabledButton]} disabled={page === 0} onPress={() => setPage((value) => Math.max(value - 1, 0))}>
+              <Text style={styles.pageButtonText}>이전</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.pageButton, page >= totalPages - 1 && styles.disabledButton]} disabled={page >= totalPages - 1} onPress={() => setPage((value) => Math.min(value + 1, totalPages - 1))}>
+              <Text style={styles.pageButtonText}>다음</Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
       </View>
     </ScrollView>
   );
+}
+
+function Summary({ label, value }: { label: string; value: number | string }) {
+  return <View style={styles.summaryCard}><Text style={styles.summaryLabel}>{label}</Text><Text style={styles.summaryValue}>{value}</Text></View>;
+}
+
+function Shortcut({ label, onPress }: { label: string; onPress: () => void }) {
+  return <TouchableOpacity style={styles.countShortcut} onPress={onPress}><Text style={styles.countShortcutText}>{label}</Text></TouchableOpacity>;
 }
 
 const styles = StyleSheet.create({
@@ -260,7 +337,7 @@ const styles = StyleSheet.create({
   content: { padding: 18, paddingBottom: 96 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20, backgroundColor: '#F4F7FB' },
   loadingText: { marginTop: 12, color: '#64748B' },
-  eyebrow: { color: '#2563EB', fontWeight: '800', fontSize: 12, letterSpacing: 0.5 },
+  eyebrow: { color: '#2563EB', fontWeight: '800', fontSize: 12 },
   title: { marginTop: 4, fontSize: 28, fontWeight: '900', color: '#0F172A' },
   subtitle: { marginTop: 8, color: '#64748B', fontSize: 14, lineHeight: 21 },
   messageBox: { marginTop: 14, borderRadius: 12, padding: 12, borderWidth: 1 },
@@ -283,15 +360,30 @@ const styles = StyleSheet.create({
   activeSectionChip: { borderColor: '#2563EB', backgroundColor: '#EFF6FF' },
   sectionChipText: { color: '#475569', fontWeight: '900' },
   activeSectionChipText: { color: '#2563EB' },
+  addSectionRow: { flexDirection: 'row', gap: 8, marginTop: 10 },
+  addSectionInput: { flex: 1 },
+  addSectionButton: { backgroundColor: '#0F172A', borderRadius: 12, paddingHorizontal: 14, justifyContent: 'center' },
+  addSectionButtonText: { color: '#FFFFFF', fontWeight: '900' },
   countRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
   countInput: { flex: 1 },
   countShortcut: { borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 12, backgroundColor: '#FFFFFF' },
   countShortcutText: { color: '#0F172A', fontWeight: '900', fontSize: 12 },
   previewLabel: { marginTop: 14, color: '#64748B', fontSize: 12, fontWeight: '800' },
   previewText: { marginTop: 5, color: '#0F172A', fontWeight: '800', lineHeight: 20 },
-  ticketRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10, borderTopWidth: 1, borderTopColor: '#F1F5F9' },
+  sectionHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  pageText: { color: '#64748B', fontSize: 12, fontWeight: '800' },
+  sortRow: { flexDirection: 'row', gap: 8, marginTop: 10 },
+  sortButton: { flex: 1, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 12, paddingVertical: 10, alignItems: 'center' },
+  activeSortButton: { borderColor: '#2563EB', backgroundColor: '#EFF6FF' },
+  sortButtonText: { color: '#475569', fontWeight: '900' },
+  activeSortButtonText: { color: '#2563EB' },
+  ticketRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 10, paddingVertical: 10, borderTopWidth: 1, borderTopColor: '#F1F5F9' },
   ticketSeat: { color: '#0F172A', fontWeight: '900' },
-  ticketStatus: { color: '#64748B', fontSize: 12, fontWeight: '800' },
+  ticketMeta: { marginTop: 4, color: '#64748B', fontSize: 12 },
+  ticketStatus: { overflow: 'hidden', borderRadius: 999, backgroundColor: '#E0F2FE', color: '#0369A1', paddingHorizontal: 9, paddingVertical: 5, fontSize: 11, fontWeight: '900', alignSelf: 'flex-start' },
+  pagination: { flexDirection: 'row', gap: 8, marginTop: 12 },
+  pageButton: { flex: 1, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 12, paddingVertical: 11, alignItems: 'center' },
+  pageButtonText: { color: '#0F172A', fontWeight: '900' },
   emptyText: { color: '#94A3B8', paddingVertical: 18, textAlign: 'center' },
   primaryButton: { backgroundColor: '#2563EB', borderRadius: 14, paddingVertical: 15, alignItems: 'center', marginTop: 16 },
   primaryButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '900' },

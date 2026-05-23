@@ -27,10 +27,19 @@ const userTabs: TabItem[] = [
   { label: '마이', target: 'MyPage', matches: ['MyPage', 'DisputeCreate', 'MyDisputes'] },
 ];
 
+const organizerTabs: TabItem[] = [
+  { label: '센터', target: 'Organizer', matches: ['Organizer', 'OrganizerProfile'] },
+  { label: '이벤트', target: 'MyEvents', matches: ['MyEvents', 'EventCreate', 'OrganizerEventDetail', 'TicketIssue'] },
+  { label: '체크인', target: 'MyEvents', matches: ['CheckInManage', 'CheckInStatus'] },
+  { label: '설정', target: 'MyEvents', matches: ['EventSettings', 'SalesStatus'] },
+];
+
 const userRoutes = new Set(userTabs.flatMap((tab) => tab.matches));
+const organizerRoutes = new Set(organizerTabs.flatMap((tab) => tab.matches));
 
 function tabsForRoute(routeName?: string) {
   if (!routeName || HIDDEN_ROUTES.has(routeName)) return null;
+  if (organizerRoutes.has(routeName)) return organizerTabs;
   if (userRoutes.has(routeName)) return userTabs;
   return null;
 }
