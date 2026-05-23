@@ -15,6 +15,13 @@ import { backendApi } from '../lib/backend';
 import { formatEventStatus } from '../lib/ticketDisplay';
 import type { EventSummary } from '../types/api';
 
+const STATUS_FILTERS = [
+  { value: 'ALL', label: '전체' },
+  { value: 'ACTIVE', label: '운영중' },
+  { value: 'INACTIVE', label: '운영중지' },
+  { value: 'CANCELED', label: '취소됨' },
+] as const;
+
 function eventTitle(event: EventSummary) {
   return event.name || event.title || '제목 없는 이벤트';
 }
@@ -42,6 +49,7 @@ export default function MyEventsPage({ navigation }: any) {
   const [refreshing, setRefreshing] = useState(false);
   const [page, setPage] = useState(0);
   const [hasNext, setHasNext] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<(typeof STATUS_FILTERS)[number]['value']>('ALL');
 
   const load = useCallback(async (targetPage = 0, append = false) => {
     try {
@@ -72,6 +80,8 @@ export default function MyEventsPage({ navigation }: any) {
     if (!hasNext || loading) return;
     void load(page + 1, true);
   };
+
+  const filteredEvents = events.filter((event) => (statusFilter === 'ALL' ? true : event.status === statusFilter));
 
   const renderItem = ({ item }: { item: EventSummary }) => {
     const sold = item.soldTicketCount ?? 0;
@@ -129,17 +139,23 @@ export default function MyEventsPage({ navigation }: any) {
       </View>
 
       <FlatList
-        data={events}
+        data={filteredEvents}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
         contentContainerStyle={styles.list}
+        ListHeaderComponent={
+          <ScrollFilter
+            current={statusFilter}
+            onSelect={setStatusFilter}
+          />
+        }
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} />}
         onEndReached={loadMore}
         onEndReachedThreshold={0.25}
         ListEmptyComponent={
           <View style={styles.empty}>
-            <Text style={styles.emptyTitle}>등록한 이벤트가 없습니다.</Text>
-            <Text style={styles.emptyText}>첫 이벤트를 등록해 판매를 시작하세요.</Text>
+            <Text style={styles.emptyTitle}>{events.length === 0 ? '등록한 이벤트가 없습니다.' : '조건에 맞는 이벤트가 없습니다.'}</Text>
+            <Text style={styles.emptyText}>{events.length === 0 ? '첫 이벤트를 등록해 판매를 시작하세요.' : '상태 필터를 변경해 확인해보세요.'}</Text>
             <TouchableOpacity style={styles.primaryButton} onPress={() => navigation.navigate('EventCreate')}>
               <Text style={styles.primaryButtonText}>이벤트 등록</Text>
             </TouchableOpacity>
@@ -157,6 +173,18 @@ export default function MyEventsPage({ navigation }: any) {
   );
 }
 
+function ScrollFilter({ current, onSelect }: { current: (typeof STATUS_FILTERS)[number]['value']; onSelect: (value: (typeof STATUS_FILTERS)[number]['value']) => void }) {
+  return (
+    <View style={styles.filterRow}>
+      {STATUS_FILTERS.map((item) => (
+        <TouchableOpacity key={item.value} style={[styles.filterChip, current === item.value && styles.activeFilterChip]} onPress={() => onSelect(item.value)}>
+          <Text style={[styles.filterChipText, current === item.value && styles.activeFilterChipText]}>{item.label}</Text>
+        </TouchableOpacity>
+      ))}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F4F7FB' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F4F7FB' },
@@ -167,6 +195,11 @@ const styles = StyleSheet.create({
   addButton: { backgroundColor: '#2563EB', paddingHorizontal: 15, paddingVertical: 10, borderRadius: 12 },
   addButtonText: { color: '#FFFFFF', fontWeight: '900' },
   list: { padding: 18, paddingTop: 8, paddingBottom: 32 },
+  filterRow: { flexDirection: 'row', gap: 8, marginBottom: 10 },
+  filterChip: { borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: '#FFFFFF' },
+  activeFilterChip: { borderColor: '#2563EB', backgroundColor: '#EFF6FF' },
+  filterChipText: { color: '#475569', fontSize: 12, fontWeight: '800' },
+  activeFilterChipText: { color: '#2563EB' },
   card: { backgroundColor: '#FFFFFF', borderRadius: 18, padding: 16, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 12 },
   cardHead: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 },
   cardTitleWrap: { flex: 1 },

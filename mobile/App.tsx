@@ -33,6 +33,7 @@ import CheckInStatusPage from './src/pages/CheckInStatusPage';
 import EventSettingsPage from './src/pages/EventSettingsPage';
 import CheckInManagePage from './src/pages/CheckInManagePage';
 import CheckInScanPage from './src/pages/CheckInScanPage';
+import CheckInHomePage from './src/pages/CheckInHomePage';
 import DisputeCreatePage from './src/pages/DisputeCreatePage';
 import MyDisputesPage from './src/pages/MyDisputesPage';
 import BottomNavigation from './src/components/BottomNavigation';
@@ -116,6 +117,7 @@ export default function App() {
           <Stack.Screen name="OrganizerEventDetail" component={OrganizerEventDetailPage} options={{ title: '이벤트 운영' }} />
           <Stack.Screen name="SalesStatus" component={SalesStatusPage} options={{ title: '판매 현황' }} />
           <Stack.Screen name="CheckInStatus" component={CheckInStatusPage} options={{ title: '체크인 현황' }} />
+          <Stack.Screen name="CheckInHome" component={CheckInHomePage} options={{ title: '체크인' }} />
           <Stack.Screen name="EventSettings" component={EventSettingsPage} options={{ title: '이벤트 설정' }} />
           <Stack.Screen name="CheckInManage" component={CheckInManagePage} options={{ title: '체크인 관리' }} />
           <Stack.Screen name="CheckInScan" component={CheckInScanPage} options={{ title: 'QR 스캔' }} />

@@ -1,8 +1,9 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   ActivityIndicator,
   Alert,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -12,23 +13,62 @@ import {
 } from 'react-native';
 import { errorMessage } from '../lib/account';
 import { backendApi } from '../lib/backend';
-import type { UserProfile } from '../types/api';
+import { formatEventDate, formatEventStatus } from '../lib/ticketDisplay';
+import type { EventSummary, TicketDetail, UserProfile } from '../types/api';
+
+function eventTitle(event: EventSummary) {
+  return event.name || event.title || '제목 없는 이벤트';
+}
+
+function sortEvents(events: EventSummary[]) {
+  return [...events].sort((a, b) => {
+    const aTime = new Date(a.eventAt || a.eventDateTime || '').getTime();
+    const bTime = new Date(b.eventAt || b.eventDateTime || '').getTime();
+    return (Number.isNaN(bTime) ? 0 : bTime) - (Number.isNaN(aTime) ? 0 : aTime);
+  });
+}
 
 export default function OrganizerProfilePage({ navigation }: any) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [events, setEvents] = useState<EventSummary[]>([]);
+  const [checkInCountByEventId, setCheckInCountByEventId] = useState<Record<string, number>>({});
   const [displayName, setDisplayName] = useState('');
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      const me = await backendApi.getMe();
+      const [me, myEventsPage] = await Promise.all([
+        backendApi.getMe(),
+        backendApi.getMyEvents({ page: 0, size: 8 }),
+      ]);
+
+      const myEvents = sortEvents(myEventsPage.items ?? []);
+      const ticketSummaries = await Promise.all(
+        myEvents.map(async (event) => {
+          const tickets = await backendApi.getEventTickets(event.id).catch(() => [] as TicketDetail[]);
+          return {
+            eventId: event.id,
+            usedCount: tickets.filter((ticket) => ticket.status === 'USED').length,
+          };
+        }),
+      );
+
       setProfile(me);
       setDisplayName(me.displayName || '');
+      setEvents(myEvents);
+      setCheckInCountByEventId(
+        ticketSummaries.reduce<Record<string, number>>((acc, item) => {
+          acc[item.eventId] = item.usedCount;
+          return acc;
+        }, {}),
+      );
     } catch (error: any) {
       Alert.alert('내 정보 로드 실패', errorMessage(error, '내 정보를 불러오지 못했습니다.'));
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, []);
 
@@ -51,6 +91,13 @@ export default function OrganizerProfilePage({ navigation }: any) {
     }
   };
 
+  const activeEvents = useMemo(() => events.filter((event) => event.status === 'ACTIVE').length, [events]);
+  const soldTotal = useMemo(() => events.reduce((sum, event) => sum + (event.soldTicketCount ?? 0), 0), [events]);
+  const checkInTotal = useMemo(
+    () => events.reduce((sum, event) => sum + (checkInCountByEventId[event.id] ?? event.checkInCount ?? 0), 0),
+    [checkInCountByEventId, events],
+  );
+
   if (loading) {
     return (
       <View style={styles.center}>
@@ -61,16 +108,49 @@ export default function OrganizerProfilePage({ navigation }: any) {
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); void load(); }} />}
+    >
       <Text style={styles.eyebrow}>My Profile</Text>
-      <Text style={styles.title}>내 정보 보기</Text>
-      <Text style={styles.subtitle}>주최자 계정 정보와 세션 상태를 관리합니다.</Text>
+      <Text style={styles.title}>내 정보</Text>
+      <Text style={styles.subtitle}>계정 관리와 내 운영 이벤트 상태를 한 화면에서 확인합니다.</Text>
+
+      <View style={styles.metricGrid}>
+        <Metric label="운영중 이벤트" value={activeEvents} />
+        <Metric label="총 판매량" value={soldTotal} />
+        <Metric label="총 체크인" value={checkInTotal} />
+      </View>
 
       <View style={styles.avatar}>
         <Text style={styles.avatarText}>{(profile?.displayName || profile?.email || 'O').slice(0, 1).toUpperCase()}</Text>
       </View>
 
       <View style={styles.card}>
+        <View style={styles.sectionHead}>
+          <Text style={styles.cardTitle}>내 운영 이벤트 요약</Text>
+          <Text style={styles.sectionHint}>{events.length}건</Text>
+        </View>
+        {events.length === 0 ? (
+          <Text style={styles.emptyText}>운영 중인 이벤트가 없습니다.</Text>
+        ) : (
+          events.map((event) => (
+            <TouchableOpacity key={event.id} style={styles.eventCard} onPress={() => navigation.navigate('OrganizerEventDetail', { eventId: event.id })}>
+              <Text style={styles.eventTitle}>{eventTitle(event)}</Text>
+              <Text style={styles.eventMeta}>장소 {event.venue || '-'}</Text>
+              <Text style={styles.eventMeta}>일시 {formatEventDate(event.eventAt || event.eventDateTime)}</Text>
+              <View style={styles.eventFoot}>
+                <Text style={styles.badge}>{formatEventStatus(event.status)}</Text>
+                <Text style={styles.eventCount}>판매 {event.soldTicketCount ?? 0} · 체크인 {checkInCountByEventId[event.id] ?? event.checkInCount ?? 0}</Text>
+              </View>
+            </TouchableOpacity>
+          ))
+        )}
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>계정 정보</Text>
         <Text style={styles.label}>이메일</Text>
         <Text style={styles.value}>{profile?.email || '-'}</Text>
 
@@ -92,17 +172,40 @@ export default function OrganizerProfilePage({ navigation }: any) {
   );
 }
 
+function Metric({ label, value }: { label: string; value: number }) {
+  return (
+    <View style={styles.metricCard}>
+      <Text style={styles.metricLabel}>{label}</Text>
+      <Text style={styles.metricValue}>{value}</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F4F7FB' },
-  content: { padding: 18, paddingBottom: 36 },
+  content: { padding: 18, paddingBottom: 96 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20, backgroundColor: '#F4F7FB' },
   loadingText: { marginTop: 12, color: '#64748B' },
   eyebrow: { color: '#2563EB', fontWeight: '800', fontSize: 12, letterSpacing: 0.5 },
   title: { marginTop: 4, fontSize: 28, fontWeight: '900', color: '#0F172A' },
   subtitle: { marginTop: 8, color: '#64748B', fontSize: 14, lineHeight: 21 },
-  avatar: { marginTop: 22, alignSelf: 'center', width: 72, height: 72, borderRadius: 36, backgroundColor: '#E2E8F0', alignItems: 'center', justifyContent: 'center' },
+  metricGrid: { flexDirection: 'row', gap: 8, marginTop: 16 },
+  metricCard: { flex: 1, backgroundColor: '#FFFFFF', borderRadius: 16, padding: 13, borderWidth: 1, borderColor: '#E2E8F0' },
+  metricLabel: { color: '#64748B', fontSize: 12, fontWeight: '800' },
+  metricValue: { marginTop: 8, color: '#0F172A', fontSize: 24, fontWeight: '900' },
+  avatar: { marginTop: 18, alignSelf: 'center', width: 72, height: 72, borderRadius: 36, backgroundColor: '#E2E8F0', alignItems: 'center', justifyContent: 'center' },
   avatarText: { color: '#2563EB', fontSize: 28, fontWeight: '900' },
   card: { marginTop: 18, backgroundColor: '#FFFFFF', borderRadius: 18, padding: 16, borderWidth: 1, borderColor: '#E2E8F0' },
+  sectionHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
+  sectionHint: { color: '#64748B', fontSize: 12, fontWeight: '800' },
+  cardTitle: { color: '#0F172A', fontSize: 17, fontWeight: '900' },
+  eventCard: { borderTopWidth: 1, borderTopColor: '#F1F5F9', paddingTop: 12, paddingBottom: 12 },
+  eventTitle: { color: '#0F172A', fontWeight: '900', fontSize: 15 },
+  eventMeta: { marginTop: 4, color: '#64748B', fontSize: 12 },
+  eventFoot: { marginTop: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
+  badge: { overflow: 'hidden', borderRadius: 999, backgroundColor: '#E0F2FE', color: '#0369A1', paddingHorizontal: 9, paddingVertical: 5, fontSize: 11, fontWeight: '900' },
+  eventCount: { color: '#334155', fontSize: 12, fontWeight: '800' },
+  emptyText: { color: '#94A3B8', paddingVertical: 12, textAlign: 'center' },
   label: { marginTop: 10, color: '#64748B', fontSize: 12, fontWeight: '800' },
   value: { marginTop: 5, color: '#0F172A', fontSize: 15, fontWeight: '800' },
   input: { marginTop: 7, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 12, padding: 12, backgroundColor: '#FFFFFF', color: '#0F172A' },
