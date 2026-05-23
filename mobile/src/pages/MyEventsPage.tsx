@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { errorMessage } from '../lib/account';
 import { backendApi } from '../lib/backend';
+import { formatEventStatus } from '../lib/ticketDisplay';
 import type { EventSummary } from '../types/api';
 
 function eventTitle(event: EventSummary) {
@@ -24,12 +25,6 @@ function eventDate(event: EventSummary) {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString('ko-KR');
 }
-
-const STATUS_LABEL: Record<string, string> = {
-  ACTIVE: '활성',
-  INACTIVE: '비활성',
-  CANCELED: '취소',
-};
 
 function sortCanceledLast<T extends { status?: string; eventAt?: string; eventDateTime?: string }>(items: T[]) {
   return [...items].sort((a, b) => {
@@ -88,22 +83,23 @@ export default function MyEventsPage({ navigation }: any) {
         <View style={styles.cardHead}>
           <View style={styles.cardTitleWrap}>
             <Text style={styles.eventTitle}>{eventTitle(item)}</Text>
-            <Text style={styles.eventMeta}>{item.venue} · {eventDate(item)}</Text>
+            <Text style={styles.eventMeta}>장소 {item.venue || '-'}</Text>
+            <Text style={styles.eventMeta}>일시 {eventDate(item)}</Text>
           </View>
-          <Text style={styles.statusBadge}>{STATUS_LABEL[item.status] ?? item.status}</Text>
+          <Text style={styles.statusBadge}>{formatEventStatus(item.status)}</Text>
         </View>
 
         <View style={styles.stats}>
           <View style={styles.statItem}>
-            <Text style={styles.statLabel}>판매</Text>
+            <Text style={styles.statLabel}>판매 완료</Text>
             <Text style={styles.statValue}>{sold}</Text>
           </View>
           <View style={styles.statItem}>
-            <Text style={styles.statLabel}>잔여</Text>
+            <Text style={styles.statLabel}>잔여 좌석</Text>
             <Text style={styles.statValue}>{remaining}</Text>
           </View>
           <View style={styles.statItem}>
-            <Text style={styles.statLabel}>전체</Text>
+            <Text style={styles.statLabel}>총 발행</Text>
             <Text style={styles.statValue}>{total || '-'}</Text>
           </View>
         </View>

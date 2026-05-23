@@ -8,15 +8,24 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { accountStatusMessage, errorMessage } from '../lib/account';
 import { backendApi } from '../lib/backend';
-import { formatEventDate, formatTicketStatus } from '../lib/ticketDisplay';
+import { formatEventDate, formatEventStatus, formatTicketStatus } from '../lib/ticketDisplay';
 import type { EventDetail, TicketDetail } from '../types/api';
 
-const PAGE_SIZE = 8;
+const PAGE_SIZE = 12;
+const MAX_VISIBLE_PAGES = 4;
+
+function seatSectionOf(seatInfo?: string) {
+  const normalized = String(seatInfo ?? '').trim().toUpperCase();
+  if (!normalized) return '';
+  if (normalized.startsWith('VIP')) return 'VIP';
+  return normalized.split(/[-\s]/)[0];
+}
 
 function ticketId(ticket: TicketDetail) {
   return String(ticket.id ?? ticket.ticketId ?? '');
@@ -37,13 +46,51 @@ export default function OrganizerEventDetailPage({ navigation, route }: any) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [ticketPage, setTicketPage] = useState(0);
+  const [ticketPage, setTicketPage] = useState(1);
+  const [seatQuery, setSeatQuery] = useState('');
+  const [selectedSeatSection, setSelectedSeatSection] = useState('전체');
+  const [sortMode, setSortMode] = useState<'latest' | 'seat'>('latest');
 
   const soldTickets = tickets.filter((ticket) => ticket.status === 'SOLD' || ticket.status === 'LISTED' || ticket.status === 'USED').length;
   const usedTickets = tickets.filter((ticket) => ticket.status === 'USED').length;
   const availableTickets = tickets.filter((ticket) => ticket.status === 'AVAILABLE').length;
-  const totalPages = Math.max(1, Math.ceil(tickets.length / PAGE_SIZE));
-  const pagedTickets = useMemo(() => tickets.slice(ticketPage * PAGE_SIZE, ticketPage * PAGE_SIZE + PAGE_SIZE), [ticketPage, tickets]);
+  const seatFilters = useMemo(() => {
+    const sections = Array.from(new Set(tickets.map((ticket) => seatSectionOf(ticket.seatInfo)).filter(Boolean))).sort((a, b) =>
+      a.localeCompare(b, 'ko-KR', { numeric: true }),
+    );
+    return ['전체', ...sections];
+  }, [tickets]);
+
+  const filteredTickets = useMemo(() => {
+    const query = seatQuery.trim().toUpperCase();
+    const base = tickets.filter((ticket) => {
+      const seatInfo = String(ticket.seatInfo || '').toUpperCase();
+      const matchesSection = selectedSeatSection === '전체' || seatSectionOf(ticket.seatInfo) === selectedSeatSection;
+      const matchesQuery = !query || seatInfo.includes(query);
+      return matchesSection && matchesQuery;
+    });
+
+    return [...base].sort((a, b) => {
+      if (sortMode === 'seat') {
+        return String(a.seatInfo || '').localeCompare(String(b.seatInfo || ''), 'ko-KR', { numeric: true });
+      }
+      return new Date(b.createdAt || '').getTime() - new Date(a.createdAt || '').getTime();
+    });
+  }, [seatQuery, selectedSeatSection, sortMode, tickets]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredTickets.length / PAGE_SIZE));
+  const currentPage = Math.min(ticketPage, totalPages);
+  const pagedTickets = useMemo(() => {
+    const startIndex = (currentPage - 1) * PAGE_SIZE;
+    return filteredTickets.slice(startIndex, startIndex + PAGE_SIZE);
+  }, [currentPage, filteredTickets]);
+
+  const pageNumbers = useMemo(() => {
+    const half = Math.floor(MAX_VISIBLE_PAGES / 2);
+    const start = Math.max(1, Math.min(currentPage - half, totalPages - MAX_VISIBLE_PAGES + 1));
+    const end = Math.min(totalPages, start + MAX_VISIBLE_PAGES - 1);
+    return Array.from({ length: end - start + 1 }, (_, index) => start + index);
+  }, [currentPage, totalPages]);
 
   const load = useCallback(async () => {
     if (!eventId) return;
@@ -61,7 +108,7 @@ export default function OrganizerEventDetailPage({ navigation, route }: any) {
 
       setEvent(detail);
       setTickets(eventTickets);
-      setTicketPage(0);
+      setTicketPage(1);
     } catch (error: any) {
       Alert.alert('이벤트 로드 실패', errorMessage(error, '이벤트 정보를 불러오지 못했습니다.'));
     } finally {
@@ -136,28 +183,29 @@ export default function OrganizerEventDetailPage({ navigation, route }: any) {
       <Text style={styles.subtitle}>{event.venue} · {formatEventDate(event.eventAt || event.eventDateTime)}</Text>
 
       <View style={styles.metricGrid}>
-        <Metric label="발행" value={tickets.length} />
-        <Metric label="판매" value={soldTickets} />
-        <Metric label="체크인" value={usedTickets} />
+        <Metric label="총 발행" value={tickets.length} />
+        <Metric label="판매 완료" value={soldTickets} />
+        <Metric label="사용 완료" value={usedTickets} />
       </View>
 
       <View style={styles.actions}>
         <TouchableOpacity style={styles.primaryButton} onPress={() => navigation.navigate('TicketIssue', { eventId: event.id })}>
-          <Text style={styles.primaryButtonText}>티켓 추가 발행</Text>
+          <Text style={styles.primaryButtonText}>티켓 발행</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.secondaryButton} onPress={() => changeStatus(event.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE')} disabled={saving}>
-          <Text style={styles.secondaryButtonText}>{event.status === 'ACTIVE' ? '이벤트 비활성화' : '이벤트 활성화'}</Text>
+        <TouchableOpacity style={styles.secondaryButton} onPress={() => changeStatus(event.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE')} disabled={saving || event.status === 'CANCELED'}>
+          <Text style={styles.secondaryButtonText}>{event.status === 'ACTIVE' ? '운영중지' : '운영 재개'}</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.dangerButton} onPress={cancelEvent} disabled={saving || event.status === 'CANCELED'}>
-          <Text style={styles.dangerButtonText}>{event.status === 'CANCELED' ? '취소된 이벤트' : '이벤트 취소'}</Text>
+          <Text style={styles.dangerButtonText}>{event.status === 'CANCELED' ? '이벤트 취소됨' : '이벤트 취소'}</Text>
         </TouchableOpacity>
+        <Text style={styles.statusHint}>현재 상태 {formatEventStatus(event.status)}</Text>
       </View>
 
       <View style={styles.card}>
         <Text style={styles.cardTitle}>운영 메뉴</Text>
         <MenuCard
           title="판매 현황"
-          text={`판매 ${soldTickets} · 잔여 ${availableTickets} · 가격 ${weiToEth(event.ticketPriceWei)}`}
+          text={`판매 완료 ${soldTickets} · 잔여 좌석 ${availableTickets} · 가격 ${weiToEth(event.ticketPriceWei)}`}
           onPress={() => navigation.navigate('SalesStatus', { eventId: event.id })}
         />
         <MenuCard
@@ -172,7 +220,7 @@ export default function OrganizerEventDetailPage({ navigation, route }: any) {
         />
         <MenuCard
           title="체크인 관리"
-          text="QR 스캔으로 입장 처리하고 검증자를 관리합니다."
+          text="QR 스캔 후 검증 결과를 확인하고 단계적으로 입장 처리합니다."
           onPress={() => navigation.navigate('CheckInManage', { eventId: event.id })}
         />
       </View>
@@ -180,9 +228,42 @@ export default function OrganizerEventDetailPage({ navigation, route }: any) {
       <View style={styles.card}>
         <View style={styles.sectionHead}>
           <Text style={styles.cardTitle}>최근 티켓</Text>
-          <Text style={styles.pageText}>{ticketPage + 1} / {totalPages}</Text>
+          <Text style={styles.pageText}>{currentPage} / {totalPages}</Text>
         </View>
-        {tickets.length === 0 ? <Text style={styles.emptyText}>아직 발행된 티켓이 없습니다.</Text> : pagedTickets.map((ticket) => (
+        <TextInput
+          style={styles.input}
+          value={seatQuery}
+          onChangeText={(value) => {
+            setSeatQuery(value);
+            setTicketPage(1);
+          }}
+          placeholder="좌석 검색: VIP-12, A-103"
+          autoCapitalize="characters"
+          returnKeyType="search"
+        />
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterList}>
+          {seatFilters.map((section) => (
+            <TouchableOpacity
+              key={section}
+              style={[styles.filterChip, selectedSeatSection === section && styles.activeFilterChip]}
+              onPress={() => {
+                setSelectedSeatSection(section);
+                setTicketPage(1);
+              }}
+            >
+              <Text style={[styles.filterChipText, selectedSeatSection === section && styles.activeFilterChipText]}>{section}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+        <View style={styles.sortRow}>
+          <TouchableOpacity style={[styles.sortButton, sortMode === 'latest' && styles.activeSortButton]} onPress={() => setSortMode('latest')}>
+            <Text style={[styles.sortButtonText, sortMode === 'latest' && styles.activeSortButtonText]}>최신순</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.sortButton, sortMode === 'seat' && styles.activeSortButton]} onPress={() => setSortMode('seat')}>
+            <Text style={[styles.sortButtonText, sortMode === 'seat' && styles.activeSortButtonText]}>좌석순</Text>
+          </TouchableOpacity>
+        </View>
+        {pagedTickets.length === 0 ? <Text style={styles.emptyText}>조건에 맞는 티켓이 없습니다.</Text> : pagedTickets.map((ticket) => (
           <View key={ticketId(ticket)} style={styles.ticketRow}>
             <View style={styles.ticketInfo}>
               <Text style={styles.ticketTitle}>{ticket.seatInfo || '-'}</Text>
@@ -191,12 +272,17 @@ export default function OrganizerEventDetailPage({ navigation, route }: any) {
             <Text style={styles.badge}>{formatTicketStatus(ticket.status)}</Text>
           </View>
         ))}
-        {tickets.length > PAGE_SIZE ? (
+        {filteredTickets.length > PAGE_SIZE ? (
           <View style={styles.pagination}>
-            <TouchableOpacity style={[styles.pageButton, ticketPage === 0 && styles.disabledButton]} disabled={ticketPage === 0} onPress={() => setTicketPage((page) => Math.max(page - 1, 0))}>
+            <TouchableOpacity style={[styles.pageButton, currentPage === 1 && styles.disabledButton]} disabled={currentPage === 1} onPress={() => setTicketPage((page) => Math.max(page - 1, 1))}>
               <Text style={styles.pageButtonText}>이전</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.pageButton, ticketPage >= totalPages - 1 && styles.disabledButton]} disabled={ticketPage >= totalPages - 1} onPress={() => setTicketPage((page) => Math.min(page + 1, totalPages - 1))}>
+            {pageNumbers.map((pageNumber) => (
+              <TouchableOpacity key={pageNumber} style={[styles.pageNumberButton, currentPage === pageNumber && styles.activePageNumberButton]} onPress={() => setTicketPage(pageNumber)}>
+                <Text style={[styles.pageNumberText, currentPage === pageNumber && styles.activePageNumberText]}>{pageNumber}</Text>
+              </TouchableOpacity>
+            ))}
+            <TouchableOpacity style={[styles.pageButton, currentPage >= totalPages && styles.disabledButton]} disabled={currentPage >= totalPages} onPress={() => setTicketPage((page) => Math.min(page + 1, totalPages))}>
               <Text style={styles.pageButtonText}>다음</Text>
             </TouchableOpacity>
           </View>
@@ -253,17 +339,33 @@ const styles = StyleSheet.create({
   secondaryButtonText: { color: '#0F172A', fontSize: 16, fontWeight: '900' },
   dangerButton: { backgroundColor: '#FEF2F2', borderWidth: 1, borderColor: '#FECACA', borderRadius: 14, paddingVertical: 14, alignItems: 'center', marginTop: 10 },
   dangerButtonText: { color: '#DC2626', fontSize: 16, fontWeight: '900' },
+  statusHint: { marginTop: 10, color: '#64748B', fontSize: 12, fontWeight: '800' },
   disabledButton: { opacity: 0.55 },
   sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   pageText: { color: '#64748B', fontSize: 12, fontWeight: '800' },
+  input: { marginTop: 10, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 12, padding: 12, backgroundColor: '#FFFFFF', color: '#0F172A' },
+  filterList: { gap: 8, marginTop: 10, paddingBottom: 8 },
+  filterChip: { borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: '#FFFFFF' },
+  activeFilterChip: { borderColor: '#2563EB', backgroundColor: '#EFF6FF' },
+  filterChipText: { color: '#475569', fontWeight: '800', fontSize: 12 },
+  activeFilterChipText: { color: '#2563EB' },
+  sortRow: { flexDirection: 'row', gap: 8, marginTop: 2, marginBottom: 4 },
+  sortButton: { flex: 1, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 12, paddingVertical: 10, alignItems: 'center', backgroundColor: '#FFFFFF' },
+  activeSortButton: { borderColor: '#2563EB', backgroundColor: '#EFF6FF' },
+  sortButtonText: { color: '#475569', fontWeight: '900' },
+  activeSortButtonText: { color: '#2563EB' },
   ticketRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, borderTopWidth: 1, borderTopColor: '#F1F5F9' },
   ticketInfo: { flex: 1, paddingRight: 10 },
   ticketTitle: { color: '#0F172A', fontWeight: '900' },
   ticketMeta: { marginTop: 4, color: '#64748B', fontSize: 12 },
   badge: { overflow: 'hidden', borderRadius: 999, backgroundColor: '#E0F2FE', color: '#0369A1', paddingHorizontal: 9, paddingVertical: 5, fontSize: 11, fontWeight: '900' },
-  pagination: { flexDirection: 'row', gap: 8, marginTop: 12 },
+  pagination: { flexDirection: 'row', gap: 8, marginTop: 12, alignItems: 'center', justifyContent: 'center' },
   pageButton: { flex: 1, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 12, paddingVertical: 11, alignItems: 'center' },
   pageButtonText: { color: '#0F172A', fontWeight: '900' },
+  pageNumberButton: { minWidth: 36, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 10, paddingVertical: 9, paddingHorizontal: 8, alignItems: 'center', backgroundColor: '#FFFFFF' },
+  activePageNumberButton: { borderColor: '#2563EB', backgroundColor: '#2563EB' },
+  pageNumberText: { color: '#475569', fontWeight: '900', fontSize: 12 },
+  activePageNumberText: { color: '#FFFFFF' },
   emptyTitle: { color: '#0F172A', fontSize: 18, fontWeight: '900' },
   emptyText: { color: '#94A3B8', paddingVertical: 16, textAlign: 'center' },
 });

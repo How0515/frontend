@@ -1,9 +1,10 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import { Alert, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { errorMessage } from '../lib/account';
 import { backendApi } from '../lib/backend';
-import { formatEventDate } from '../lib/ticketDisplay';
+import { formatTicketEntryStatus } from '../lib/ticketDisplay';
+import type { TicketDetail } from '../types/api';
 
 type QrPayload = {
   ticketId?: string;
@@ -20,20 +21,37 @@ function normalizeExpiresAt(value?: string | number) {
   return String(value);
 }
 
-function checkInResultMessage(error: unknown) {
-  const message = errorMessage(error, '입장 처리에 실패했습니다.');
-  if (message.includes('이미') || message.includes('사용 완료') || message.includes('USED')) return '이미 체크인된 티켓입니다.';
-  if (message.includes('권한') || message.includes('FORBIDDEN')) {
-    return '체크인 권한이 없습니다. 전역 검증자 또는 이 이벤트의 검증자로 등록된 계정이어야 합니다.';
-  }
-  if (message.includes('만료')) return '만료된 QR입니다. 관람객에게 QR 새로고침을 요청해주세요.';
-  if (message.includes('서명') || message.includes('유효하지') || message.includes('SIGNATURE')) return 'QR 서명 또는 티켓 상태가 유효하지 않습니다.';
-  return message;
-}
-
 function parsePayload(value: string): QrPayload {
   return JSON.parse(value.trim()) as QrPayload;
 }
+
+function checkInErrorDetail(error: unknown) {
+  const message = errorMessage(error, '입장 처리에 실패했습니다.');
+
+  if (message.includes('이미') || message.includes('사용 완료') || message.includes('USED')) {
+    return { title: '중복 입장', message: '이미 체크인된 티켓입니다.' };
+  }
+  if (message.includes('권한') || message.includes('FORBIDDEN')) {
+    return {
+      title: '권한 없음',
+      message: '체크인 권한이 없습니다. 전역 검증자 또는 이 이벤트의 검증자로 등록된 계정이어야 합니다.',
+    };
+  }
+  if (message.includes('만료') || message.includes('EXPIRED')) {
+    return { title: '만료 QR', message: '만료된 QR입니다. 관람객에게 QR 새로고침을 요청해주세요.' };
+  }
+  if (message.includes('서명') || message.includes('유효하지') || message.includes('SIGNATURE')) {
+    return { title: '서명 오류', message: 'QR 서명 또는 티켓 상태가 유효하지 않습니다.' };
+  }
+
+  return { title: '처리 실패', message };
+}
+
+type Feedback = {
+  type: 'error' | 'success' | 'info';
+  title: string;
+  message: string;
+};
 
 export default function CheckInManagePage({ navigation, route }: any) {
   const eventId = route?.params?.eventId as string;
@@ -47,10 +65,19 @@ export default function CheckInManagePage({ navigation, route }: any) {
   const [memo, setMemo] = useState('');
   const [qrPayload, setQrPayload] = useState('');
   const [manualOpen, setManualOpen] = useState(false);
+  const [validatorOpen, setValidatorOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [checkingIn, setCheckingIn] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [feedback, setFeedback] = useState<{ type: 'error' | 'success' | 'info'; message: string } | null>(null);
+  const [feedback, setFeedback] = useState<Feedback | null>(null);
+  const [ticket, setTicket] = useState<TicketDetail | null>(null);
+
+  const hasQrInfo = Boolean(ticketId.trim() && claimedOwner.trim() && expiresAt.trim() && signature.trim());
+  const expired = useMemo(() => {
+    const time = new Date(expiresAt || '').getTime();
+    return Number.isFinite(time) && time <= Date.now();
+  }, [expiresAt]);
+  const qrState = !hasQrInfo ? '스캔 필요' : expired ? '만료 QR' : '검증 대기';
 
   const applyParsedPayload = useCallback((payload: QrPayload) => {
     setTicketId(payload.ticketId || '');
@@ -64,7 +91,7 @@ export default function CheckInManagePage({ navigation, route }: any) {
       const data = await backendApi.getEventValidators(eventId).catch(() => []);
       setValidators(data);
     } catch (error: any) {
-      setFeedback({ type: 'error', message: errorMessage(error, '검증자 목록을 불러오지 못했습니다.') });
+      setFeedback({ type: 'error', title: '조회 실패', message: errorMessage(error, '검증자 목록을 불러오지 못했습니다.') });
     } finally {
       setRefreshing(false);
     }
@@ -79,17 +106,38 @@ export default function CheckInManagePage({ navigation, route }: any) {
       try {
         const parsed = parsePayload(scannedPayload);
         applyParsedPayload(parsed);
-        setFeedback({ type: 'success', message: 'QR 정보를 읽었습니다. 아래 입장 처리 버튼을 눌러 완료해주세요.' });
+        setFeedback({ type: 'info', title: 'QR 스캔 완료', message: '스캔 결과를 확인한 뒤 입장 처리 버튼을 눌러주세요.' });
       } catch {
-        setFeedback({ type: 'error', message: '스캔한 QR 내용이 올바른 JSON 형식이 아닙니다.' });
+        setFeedback({ type: 'error', title: '스캔 실패', message: '스캔한 QR 내용이 올바른 JSON 형식이 아닙니다.' });
       }
     }, [applyParsedPayload, scannedPayload]),
   );
 
+  useEffect(() => {
+    if (!ticketId.trim()) {
+      setTicket(null);
+      return;
+    }
+
+    let mounted = true;
+    void backendApi
+      .getTicket(ticketId.trim())
+      .then((detail) => {
+        if (mounted) setTicket(detail);
+      })
+      .catch(() => {
+        if (mounted) setTicket(null);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [ticketId]);
+
   const addValidator = async () => {
     if (!validatorId.trim()) {
       const message = '검증자로 등록할 사용자 UUID를 입력해주세요.';
-      setFeedback({ type: 'error', message });
+      setFeedback({ type: 'error', title: '입력 필요', message });
       Alert.alert('입력 필요', message);
       return;
     }
@@ -99,11 +147,11 @@ export default function CheckInManagePage({ navigation, route }: any) {
     try {
       await backendApi.addEventValidator(eventId, { userId: validatorId.trim() });
       setValidatorId('');
-      setFeedback({ type: 'success', message: '체크인 검증자를 등록했습니다.' });
+      setFeedback({ type: 'success', title: '등록 완료', message: '체크인 검증자를 등록했습니다.' });
       await load();
     } catch (error: any) {
       const message = errorMessage(error, '검증자를 등록하지 못했습니다.');
-      setFeedback({ type: 'error', message });
+      setFeedback({ type: 'error', title: '등록 실패', message });
       Alert.alert('검증자 등록 실패', message);
     } finally {
       setSaving(false);
@@ -114,18 +162,18 @@ export default function CheckInManagePage({ navigation, route }: any) {
     try {
       const parsed = parsePayload(qrPayload);
       applyParsedPayload(parsed);
-      setFeedback({ type: 'success', message: 'QR 내용을 입장 처리 정보에 반영했습니다.' });
+      setFeedback({ type: 'info', title: 'QR 반영 완료', message: '입력한 QR 내용을 입장 처리 정보에 반영했습니다.' });
     } catch {
       const message = 'QR payload는 JSON 형식이어야 합니다.';
-      setFeedback({ type: 'error', message });
+      setFeedback({ type: 'error', title: 'QR 입력 오류', message });
       Alert.alert('QR 입력 오류', message);
     }
   };
 
   const checkIn = async () => {
-    if (!ticketId.trim() || !claimedOwner.trim() || !expiresAt.trim() || !signature.trim()) {
+    if (!hasQrInfo) {
       const message = 'QR을 먼저 스캔하거나 QR 내용을 반영해주세요.';
-      setFeedback({ type: 'error', message });
+      setFeedback({ type: 'error', title: 'QR 정보 필요', message });
       Alert.alert('QR 정보 필요', message);
       return;
     }
@@ -140,12 +188,12 @@ export default function CheckInManagePage({ navigation, route }: any) {
         signature: signature.trim(),
         memo: memo.trim() || null,
       });
-      setFeedback({ type: 'success', message: '입장 처리가 완료되었습니다.' });
+      setFeedback({ type: 'success', title: '입장 성공', message: '입장 처리가 완료되었습니다.' });
       setMemo('');
     } catch (error: any) {
-      const message = checkInResultMessage(error);
-      setFeedback({ type: 'error', message });
-      Alert.alert('입장 처리 실패', message);
+      const detail = checkInErrorDetail(error);
+      setFeedback({ type: 'error', title: detail.title, message: detail.message });
+      Alert.alert(detail.title, detail.message);
     } finally {
       setCheckingIn(false);
     }
@@ -163,29 +211,33 @@ export default function CheckInManagePage({ navigation, route }: any) {
 
       {feedback ? (
         <View style={[styles.messageBox, feedback.type === 'error' ? styles.errorBox : styles.infoBox]}>
+          <Text style={[styles.messageTitle, feedback.type === 'error' ? styles.errorText : styles.infoText]}>{feedback.title}</Text>
           <Text style={[styles.messageText, feedback.type === 'error' ? styles.errorText : styles.infoText]}>{feedback.message}</Text>
         </View>
       ) : null}
 
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>QR 스캔</Text>
-        <Text style={styles.cardText}>관람객의 모바일 체크인 QR을 스캔해주세요. 스캔 후 바로 입장 처리를 진행할 수 있습니다.</Text>
+        <Text style={styles.cardTitle}>기본 상태</Text>
+        <Text style={styles.cardText}>먼저 QR 스캔 버튼으로 관람객의 체크인 QR을 읽어주세요.</Text>
         <TouchableOpacity style={styles.primaryButton} onPress={() => navigation.navigate('CheckInScan', { eventId })}>
           <Text style={styles.primaryButtonText}>QR 스캔하기</Text>
         </TouchableOpacity>
       </View>
 
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>입장 처리</Text>
-        <Info label="티켓" value={ticketId || 'QR을 스캔해주세요'} />
-        <Info label="만료 시간" value={expiresAt ? formatEventDate(expiresAt) : '-'} />
-        <Info label="소유 지갑" value={claimedOwner || '-'} />
-        <Text style={styles.label}>메모</Text>
-        <TextInput style={styles.input} value={memo} onChangeText={setMemo} placeholder="선택 입력" />
-        <TouchableOpacity style={[styles.primaryButton, checkingIn && styles.disabledButton]} disabled={checkingIn} onPress={checkIn}>
-          <Text style={styles.primaryButtonText}>{checkingIn ? '처리 중...' : '입장 처리'}</Text>
-        </TouchableOpacity>
-      </View>
+      {hasQrInfo ? (
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>QR 스캔 결과</Text>
+          <Info label="좌석" value={ticket?.seatInfo || `티켓 ${ticketId}`} />
+          <Info label="사용자" value={claimedOwner || '-'} />
+          <Info label="만료 여부" value={expired ? '만료됨' : '유효'} />
+          <Info label="상태" value={ticket ? formatTicketEntryStatus(ticket.status) : qrState} />
+          <Text style={styles.label}>운영 메모</Text>
+          <TextInput style={styles.input} value={memo} onChangeText={setMemo} placeholder="선택 입력" />
+          <TouchableOpacity style={[styles.primaryButton, checkingIn && styles.disabledButton]} disabled={checkingIn} onPress={checkIn}>
+            <Text style={styles.primaryButtonText}>{checkingIn ? '처리 중...' : '입장 처리'}</Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
 
       <View style={styles.card}>
         <TouchableOpacity style={styles.collapseHeader} onPress={() => setManualOpen((value) => !value)}>
@@ -204,21 +256,28 @@ export default function CheckInManagePage({ navigation, route }: any) {
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>검증자 관리</Text>
-        <Text style={styles.cardText}>이 이벤트의 체크인 처리를 맡을 계정을 등록합니다.</Text>
-        <TextInput style={styles.input} value={validatorId} onChangeText={setValidatorId} placeholder="검증자 사용자 UUID" autoCapitalize="none" />
-        <TouchableOpacity style={[styles.secondaryButton, saving && styles.disabledButton]} disabled={saving} onPress={addValidator}>
-          <Text style={styles.secondaryButtonText}>{saving ? '등록 중...' : '검증자 등록'}</Text>
+        <TouchableOpacity style={styles.collapseHeader} onPress={() => setValidatorOpen((value) => !value)}>
+          <Text style={styles.cardTitle}>검증자 관리</Text>
+          <Text style={styles.chevron}>{validatorOpen ? '⌃' : '⌄'}</Text>
         </TouchableOpacity>
-        {validators.length === 0 ? (
-          <Text style={styles.emptyText}>등록된 검증자가 없습니다.</Text>
-        ) : (
-          validators.map((validator, index) => (
-            <Text key={String(validator.id ?? index)} style={styles.validatorText}>
-              {String(validator.displayName ?? validator.validatorId ?? validator.userId ?? validator.id ?? '-')}
-            </Text>
-          ))
-        )}
+        {validatorOpen ? (
+          <>
+            <Text style={styles.cardText}>이 이벤트의 체크인 처리를 맡을 계정을 등록합니다.</Text>
+            <TextInput style={styles.input} value={validatorId} onChangeText={setValidatorId} placeholder="검증자 사용자 UUID" autoCapitalize="none" />
+            <TouchableOpacity style={[styles.secondaryButton, saving && styles.disabledButton]} disabled={saving} onPress={addValidator}>
+              <Text style={styles.secondaryButtonText}>{saving ? '등록 중...' : '검증자 등록'}</Text>
+            </TouchableOpacity>
+            {validators.length === 0 ? (
+              <Text style={styles.emptyText}>등록된 검증자가 없습니다.</Text>
+            ) : (
+              validators.map((validator, index) => (
+                <Text key={String(validator.id ?? index)} style={styles.validatorText}>
+                  {String(validator.displayName ?? validator.validatorId ?? validator.userId ?? validator.id ?? '-')}
+                </Text>
+              ))
+            )}
+          </>
+        ) : null}
       </View>
     </ScrollView>
   );
@@ -242,6 +301,7 @@ const styles = StyleSheet.create({
   messageBox: { marginTop: 14, borderRadius: 12, padding: 12, borderWidth: 1 },
   infoBox: { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE' },
   errorBox: { backgroundColor: '#FEF2F2', borderColor: '#FECACA' },
+  messageTitle: { fontWeight: '900', lineHeight: 20, marginBottom: 4 },
   messageText: { fontWeight: '800', lineHeight: 19 },
   infoText: { color: '#1D4ED8' },
   errorText: { color: '#DC2626' },

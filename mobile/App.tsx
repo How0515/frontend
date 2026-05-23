@@ -43,16 +43,41 @@ const navigationRef = createNavigationContainerRef<any>();
 
 export default function App() {
   const [currentRouteName, setCurrentRouteName] = React.useState('Landing');
+  const lastOrganizerEventIdRef = React.useRef<string | null>(null);
 
   const syncCurrentRoute = React.useCallback(() => {
-    const routeName = navigationRef.getCurrentRoute()?.name;
+    const route = navigationRef.getCurrentRoute();
+    const routeName = route?.name;
+    const routeParams = route?.params as { eventId?: string } | undefined;
+    const routeEventId = routeParams?.eventId;
+
+    if (typeof routeEventId === 'string' && routeEventId.trim()) {
+      lastOrganizerEventIdRef.current = routeEventId;
+    }
+
     if (routeName) {
       setCurrentRouteName(routeName);
     }
   }, []);
 
   const navigateFromBottom = React.useCallback((routeName: string) => {
+    const eventScopedRoutes = new Set(['TicketIssue', 'SalesStatus', 'CheckInStatus', 'EventSettings', 'CheckInManage']);
+
     if (navigationRef.isReady()) {
+      if (eventScopedRoutes.has(routeName)) {
+        const currentParams = navigationRef.getCurrentRoute()?.params as { eventId?: string } | undefined;
+        const currentEventId = currentParams?.eventId;
+        const eventId = typeof currentEventId === 'string' && currentEventId.trim() ? currentEventId : lastOrganizerEventIdRef.current;
+
+        if (eventId) {
+          navigationRef.navigate(routeName, { eventId });
+          return;
+        }
+
+        navigationRef.navigate('MyEvents');
+        return;
+      }
+
       navigationRef.navigate(routeName);
     }
   }, []);

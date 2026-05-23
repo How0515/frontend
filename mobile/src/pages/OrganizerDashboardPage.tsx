@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { accountStatusMessage, errorMessage } from '../lib/account';
 import { backendApi } from '../lib/backend';
-import { formatEventDate } from '../lib/ticketDisplay';
+import { formatEventDate, formatEventStatus } from '../lib/ticketDisplay';
 import type { EventSummary, OrganizerApplication, UserProfile } from '../types/api';
 
 function eventTitle(event: EventSummary) {
@@ -40,13 +40,6 @@ function applicationTime(application: OrganizerApplication) {
   const value = String(application.updatedAt || application.createdAt || '');
   const time = new Date(value).getTime();
   return Number.isNaN(time) ? 0 : time;
-}
-
-function statusLabel(status?: string) {
-  if (status === 'ACTIVE') return '운영중';
-  if (status === 'INACTIVE') return '비활성';
-  if (status === 'CANCELED') return '취소됨';
-  return status || '-';
 }
 
 export default function OrganizerDashboardPage({ navigation }: any) {
@@ -203,7 +196,7 @@ export default function OrganizerDashboardPage({ navigation }: any) {
           <View style={styles.metricGrid}>
             <Metric label="내 이벤트" value={events.length} />
             <Metric label="운영중" value={activeEvents} />
-            <Metric label="판매 티켓" value={soldTickets} />
+            <Metric label="판매 완료" value={soldTickets} />
           </View>
 
           <View style={styles.actions}>
@@ -230,9 +223,10 @@ export default function OrganizerDashboardPage({ navigation }: any) {
                 <TouchableOpacity key={event.id} style={styles.eventRow} onPress={() => navigation.navigate('OrganizerEventDetail', { eventId: event.id })}>
                   <View style={styles.eventInfo}>
                     <Text style={styles.eventTitle}>{eventTitle(event)}</Text>
-                    <Text style={styles.eventMeta}>{event.venue} · {formatEventDate(event.eventAt || event.eventDateTime)}</Text>
+                    <Text style={styles.eventMeta}>장소 {event.venue || '-'}</Text>
+                    <Text style={styles.eventMeta}>일시 {formatEventDate(event.eventAt || event.eventDateTime)}</Text>
                   </View>
-                  <Text style={styles.badge}>{statusLabel(event.status)}</Text>
+                  <Text style={styles.badge}>{formatEventStatus(event.status)}</Text>
                 </TouchableOpacity>
               ))
             )}

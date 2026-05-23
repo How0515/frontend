@@ -30,8 +30,8 @@ const userTabs: TabItem[] = [
 const organizerTabs: TabItem[] = [
   { label: '센터', target: 'Organizer', matches: ['Organizer', 'OrganizerProfile'] },
   { label: '이벤트', target: 'MyEvents', matches: ['MyEvents', 'EventCreate', 'OrganizerEventDetail', 'TicketIssue'] },
-  { label: '체크인', target: 'MyEvents', matches: ['CheckInManage', 'CheckInStatus'] },
-  { label: '설정', target: 'MyEvents', matches: ['EventSettings', 'SalesStatus'] },
+  { label: '체크인', target: 'CheckInManage', matches: ['CheckInManage', 'CheckInStatus', 'CheckInScan'] },
+  { label: '설정', target: 'EventSettings', matches: ['EventSettings', 'SalesStatus'] },
 ];
 
 const userRoutes = new Set(userTabs.flatMap((tab) => tab.matches));
@@ -63,7 +63,7 @@ export default function BottomNavigation({ routeName, onNavigate }: BottomNaviga
 
         return (
           <TouchableOpacity
-            key={tab.target}
+            key={`${tab.label}-${tab.target}`}
             accessibilityRole="button"
             accessibilityState={{ selected: active }}
             onPress={() => onNavigate(tab.target)}

@@ -18,6 +18,7 @@ import type { EventDetail, TicketDetail } from '../types/api';
 
 const DEFAULT_SEAT_SECTIONS = ['A', 'B', 'C', 'D', 'VIP'];
 const PAGE_SIZE = 12;
+const MAX_VISIBLE_PAGES = 4;
 
 function buildSeats(count: number, section: string, startNumber: number) {
   return Array.from({ length: count }, (_, index) => `${section}-${startNumber + index}`);
@@ -41,6 +42,13 @@ function nextSeatNumber(tickets: TicketDetail[], section: string) {
   return numbers.length === 0 ? 1 : Math.max(...numbers) + 1;
 }
 
+function seatSectionOf(seatInfo?: string) {
+  const normalized = String(seatInfo ?? '').trim().toUpperCase();
+  if (!normalized) return '';
+  if (normalized.startsWith('VIP')) return 'VIP';
+  return normalized.split(/[-\s]/)[0];
+}
+
 export default function TicketIssuePage({ navigation, route }: any) {
   const eventId = route?.params?.eventId as string;
   const [event, setEvent] = useState<EventDetail | null>(null);
@@ -53,8 +61,9 @@ export default function TicketIssuePage({ navigation, route }: any) {
   const [newSection, setNewSection] = useState('');
   const [startNumber, setStartNumber] = useState('1');
   const [query, setQuery] = useState('');
+  const [selectedSeatSection, setSelectedSeatSection] = useState('전체');
   const [sortMode, setSortMode] = useState<'latest' | 'seat'>('latest');
-  const [page, setPage] = useState(0);
+  const [page, setPage] = useState(1);
   const [issuing, setIssuing] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'error' | 'success'; message: string } | null>(null);
 
@@ -83,7 +92,7 @@ export default function TicketIssuePage({ navigation, route }: any) {
       setEvent(eventDetail);
       setTickets(issuedTickets);
       setStartNumber(String(nextSeatNumber(issuedTickets, seatSection)));
-      setPage(0);
+      setPage(1);
     } catch (error: any) {
       const message = errorMessage(error, '현재 발행 정보를 불러오지 못했습니다.');
       setFeedback({ type: 'error', message });
@@ -107,9 +116,21 @@ export default function TicketIssuePage({ navigation, route }: any) {
     return buildSeats(Math.min(count, 8), seatSection, start);
   }, [issueCount, seatSection, startNumber]);
 
+  const ticketSeatFilters = useMemo(() => {
+    const sections = Array.from(new Set(tickets.map((ticket) => seatSectionOf(ticket.seatInfo)).filter(Boolean))).sort((a, b) =>
+      a.localeCompare(b, 'ko-KR', { numeric: true }),
+    );
+    return ['전체', ...sections];
+  }, [tickets]);
+
   const filteredTickets = useMemo(() => {
     const normalized = query.trim().toLowerCase();
-    const base = normalized ? tickets.filter((ticket) => ticket.seatInfo?.toLowerCase().includes(normalized)) : tickets;
+    const base = tickets.filter((ticket) => {
+      const seatInfo = String(ticket.seatInfo || '').toLowerCase();
+      const matchesQuery = !normalized || seatInfo.includes(normalized);
+      const matchesSection = selectedSeatSection === '전체' || seatSectionOf(ticket.seatInfo) === selectedSeatSection;
+      return matchesQuery && matchesSection;
+    });
     return [...base].sort((a, b) => {
       if (sortMode === 'seat') {
         const sectionCompare = String(a.seatInfo || '').localeCompare(String(b.seatInfo || ''), 'ko-KR', { numeric: true });
@@ -117,10 +138,17 @@ export default function TicketIssuePage({ navigation, route }: any) {
       }
       return new Date(b.createdAt || '').getTime() - new Date(a.createdAt || '').getTime();
     });
-  }, [query, sortMode, tickets]);
+  }, [query, selectedSeatSection, sortMode, tickets]);
 
   const totalPages = Math.max(1, Math.ceil(filteredTickets.length / PAGE_SIZE));
-  const pagedTickets = filteredTickets.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
+  const currentPage = Math.min(page, totalPages);
+  const pagedTickets = filteredTickets.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const pageNumbers = useMemo(() => {
+    const half = Math.floor(MAX_VISIBLE_PAGES / 2);
+    const start = Math.max(1, Math.min(currentPage - half, totalPages - MAX_VISIBLE_PAGES + 1));
+    const end = Math.min(totalPages, start + MAX_VISIBLE_PAGES - 1);
+    return Array.from({ length: end - start + 1 }, (_, index) => start + index);
+  }, [currentPage, totalPages]);
 
   const setAllRemaining = () => {
     setIssueCount(String(remainingCount));
@@ -237,7 +265,7 @@ export default function TicketIssuePage({ navigation, route }: any) {
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>이번에 발행할 티켓</Text>
+        <Text style={styles.cardTitle}>발행 영역</Text>
         <Text style={styles.helpText}>기본 구역을 선택하거나 직접 구역을 추가할 수 있습니다.</Text>
 
         <Text style={styles.label}>좌석 구역</Text>
@@ -282,10 +310,24 @@ export default function TicketIssuePage({ navigation, route }: any) {
 
       <View style={styles.card}>
         <View style={styles.sectionHead}>
-          <Text style={styles.cardTitle}>발행 좌석 탐색</Text>
-          <Text style={styles.pageText}>{page + 1} / {totalPages}</Text>
+          <Text style={styles.cardTitle}>최근 발행 좌석</Text>
+          <Text style={styles.pageText}>{currentPage} / {totalPages}</Text>
         </View>
-        <TextInput style={styles.input} value={query} onChangeText={(value) => { setQuery(value); setPage(0); }} placeholder="좌석 검색: A-12, VIP-3" />
+        <TextInput style={styles.input} value={query} onChangeText={(value) => { setQuery(value); setPage(1); }} placeholder="좌석 검색: A-12, VIP-3" />
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterList}>
+          {ticketSeatFilters.map((section) => (
+            <TouchableOpacity
+              key={section}
+              style={[styles.filterChip, selectedSeatSection === section && styles.activeFilterChip]}
+              onPress={() => {
+                setSelectedSeatSection(section);
+                setPage(1);
+              }}
+            >
+              <Text style={[styles.filterChipText, selectedSeatSection === section && styles.activeFilterChipText]}>{section}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
         <View style={styles.sortRow}>
           <TouchableOpacity style={[styles.sortButton, sortMode === 'latest' && styles.activeSortButton]} onPress={() => setSortMode('latest')}>
             <Text style={[styles.sortButtonText, sortMode === 'latest' && styles.activeSortButtonText]}>최신순</Text>
@@ -311,10 +353,15 @@ export default function TicketIssuePage({ navigation, route }: any) {
 
         {filteredTickets.length > PAGE_SIZE ? (
           <View style={styles.pagination}>
-            <TouchableOpacity style={[styles.pageButton, page === 0 && styles.disabledButton]} disabled={page === 0} onPress={() => setPage((value) => Math.max(value - 1, 0))}>
+            <TouchableOpacity style={[styles.pageButton, currentPage === 1 && styles.disabledButton]} disabled={currentPage === 1} onPress={() => setPage((value) => Math.max(value - 1, 1))}>
               <Text style={styles.pageButtonText}>이전</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.pageButton, page >= totalPages - 1 && styles.disabledButton]} disabled={page >= totalPages - 1} onPress={() => setPage((value) => Math.min(value + 1, totalPages - 1))}>
+            {pageNumbers.map((pageNumber) => (
+              <TouchableOpacity key={pageNumber} style={[styles.pageNumberButton, currentPage === pageNumber && styles.activePageNumberButton]} onPress={() => setPage(pageNumber)}>
+                <Text style={[styles.pageNumberText, currentPage === pageNumber && styles.activePageNumberText]}>{pageNumber}</Text>
+              </TouchableOpacity>
+            ))}
+            <TouchableOpacity style={[styles.pageButton, currentPage >= totalPages && styles.disabledButton]} disabled={currentPage >= totalPages} onPress={() => setPage((value) => Math.min(value + 1, totalPages))}>
               <Text style={styles.pageButtonText}>다음</Text>
             </TouchableOpacity>
           </View>
@@ -372,6 +419,11 @@ const styles = StyleSheet.create({
   previewText: { marginTop: 5, color: '#0F172A', fontWeight: '800', lineHeight: 20 },
   sectionHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   pageText: { color: '#64748B', fontSize: 12, fontWeight: '800' },
+  filterList: { gap: 8, marginTop: 10, paddingBottom: 8 },
+  filterChip: { borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: '#FFFFFF' },
+  activeFilterChip: { borderColor: '#2563EB', backgroundColor: '#EFF6FF' },
+  filterChipText: { color: '#475569', fontWeight: '800', fontSize: 12 },
+  activeFilterChipText: { color: '#2563EB' },
   sortRow: { flexDirection: 'row', gap: 8, marginTop: 10 },
   sortButton: { flex: 1, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 12, paddingVertical: 10, alignItems: 'center' },
   activeSortButton: { borderColor: '#2563EB', backgroundColor: '#EFF6FF' },
@@ -381,9 +433,13 @@ const styles = StyleSheet.create({
   ticketSeat: { color: '#0F172A', fontWeight: '900' },
   ticketMeta: { marginTop: 4, color: '#64748B', fontSize: 12 },
   ticketStatus: { overflow: 'hidden', borderRadius: 999, backgroundColor: '#E0F2FE', color: '#0369A1', paddingHorizontal: 9, paddingVertical: 5, fontSize: 11, fontWeight: '900', alignSelf: 'flex-start' },
-  pagination: { flexDirection: 'row', gap: 8, marginTop: 12 },
+  pagination: { flexDirection: 'row', gap: 8, marginTop: 12, alignItems: 'center', justifyContent: 'center' },
   pageButton: { flex: 1, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 12, paddingVertical: 11, alignItems: 'center' },
   pageButtonText: { color: '#0F172A', fontWeight: '900' },
+  pageNumberButton: { minWidth: 36, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 10, paddingVertical: 9, paddingHorizontal: 8, alignItems: 'center', backgroundColor: '#FFFFFF' },
+  activePageNumberButton: { borderColor: '#2563EB', backgroundColor: '#2563EB' },
+  pageNumberText: { color: '#475569', fontWeight: '900', fontSize: 12 },
+  activePageNumberText: { color: '#FFFFFF' },
   emptyText: { color: '#94A3B8', paddingVertical: 18, textAlign: 'center' },
   primaryButton: { backgroundColor: '#2563EB', borderRadius: 14, paddingVertical: 15, alignItems: 'center', marginTop: 16 },
   primaryButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '900' },

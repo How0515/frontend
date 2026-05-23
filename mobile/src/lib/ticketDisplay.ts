@@ -31,6 +31,13 @@ const VALIDITY_REASON_LABEL: Record<string, string> = {
   NOT_OWNER: '소유자 불일치',
 };
 
+const EVENT_STATUS_LABEL: Record<string, string> = {
+  ACTIVE: '운영중',
+  INACTIVE: '운영중지',
+  CANCELED: '이벤트 취소',
+  CANCELLED: '이벤트 취소',
+};
+
 export function formatTicketStatus(status?: string | null) {
   const key = status?.toUpperCase() ?? '';
   return TICKET_STATUS_LABEL[key] ?? status ?? '-';
@@ -57,4 +64,9 @@ export function formatTicketValidity(validity?: Record<string, unknown> | null) 
 
 export function formatEventDate(value?: string | null) {
   return value ? new Date(value).toLocaleString() : '-';
+}
+
+export function formatEventStatus(status?: string | null) {
+  const key = status?.toUpperCase() ?? '';
+  return EVENT_STATUS_LABEL[key] ?? status ?? '-';
 }

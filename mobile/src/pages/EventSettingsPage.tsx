@@ -34,6 +34,13 @@ export default function EventSettingsPage({ route }: any) {
   const [loading, setLoading] = useState(true);
   const [feedback, setFeedback] = useState<string | null>(null);
 
+  const statusDescription =
+    status === 'ACTIVE'
+      ? '판매와 체크인이 가능한 상태입니다.'
+      : status === 'INACTIVE'
+        ? '운영중지 상태입니다. 판매/체크인이 일시 중단됩니다.'
+        : '이벤트 취소 상태입니다. 이벤트 자체가 취소되어 복구가 제한될 수 있습니다.';
+
   const load = useCallback(async () => {
     try {
       const detail = await backendApi.getEvent(eventId);
@@ -206,11 +213,12 @@ export default function EventSettingsPage({ route }: any) {
               {event?.adminCanceled ? (
                 <Text style={styles.warningText}>관리자가 취소한 이벤트입니다. 주최자는 재활성화할 수 없습니다.</Text>
               ) : null}
+              <Text style={styles.statusDescription}>{statusDescription}</Text>
               <View style={styles.statusGrid}>
                 {[
-                  { value: 'ACTIVE', label: '활성' },
-                  { value: 'INACTIVE', label: '비활성' },
-                  { value: 'CANCELED', label: '취소' },
+                  { value: 'ACTIVE', label: '운영중' },
+                  { value: 'INACTIVE', label: '운영중지' },
+                  { value: 'CANCELED', label: '이벤트 취소' },
                 ].map((item) => (
                   <TouchableOpacity
                     key={item.value}
@@ -250,6 +258,7 @@ const styles = StyleSheet.create({
   collapseHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   chevron: { color: '#64748B', fontSize: 20, fontWeight: '900' },
   warningText: { marginTop: 10, color: '#B91C1C', fontSize: 13, fontWeight: '800', lineHeight: 19 },
+  statusDescription: { marginTop: 10, color: '#475569', fontSize: 13, lineHeight: 19 },
   label: { marginTop: 12, marginBottom: 6, color: '#334155', fontSize: 13, fontWeight: '800' },
   input: { borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 12, padding: 12, backgroundColor: '#FFFFFF', color: '#0F172A' },
   textArea: { minHeight: 100, textAlignVertical: 'top' },
