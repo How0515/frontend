@@ -1,5 +1,5 @@
 import { useAccount, useAppKit, useProvider } from '@reown/appkit-react-native';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
@@ -88,7 +88,9 @@ export default function AuthPage({ navigation, route }: any) {
   const [walletStep, setWalletStep] = useState<WalletStep>('idle');
   const [walletMode, setWalletMode] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [pendingWalletLogin, setPendingWalletLogin] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'error' | 'success'; message: string } | null>(null);
+  const autoWalletLoginRef = useRef(false);
 
   const { open, disconnect } = useAppKit();
   const { address: appKitAddress, isConnected } = useAccount();
@@ -183,8 +185,9 @@ export default function AuthPage({ navigation, route }: any) {
 
     setWalletStep('connecting');
     if (!isConnected || !appKitAddress || !provider) {
+      setPendingWalletLogin(true);
       open({ view: 'Connect' });
-      setFeedback({ type: 'success', message: '지갑 연결 화면을 열었습니다. 연결을 완료한 뒤 다시 인증 버튼을 눌러 주세요.' });
+      setFeedback({ type: 'success', message: '지갑 연결 화면을 열었습니다. 연결 승인 후 자동으로 서명 요청을 이어갑니다.' });
       setWalletStep('idle');
       return null;
     }
@@ -207,6 +210,7 @@ export default function AuthPage({ navigation, route }: any) {
 
   const handleWalletLogin = async () => {
     if (!isLogin && !displayName.trim()) {
+      setPendingWalletLogin(false);
       const message = '이름을 입력해 주세요.';
       setFeedback({ type: 'error', message });
       Alert.alert('입력 필요', message);
@@ -221,6 +225,7 @@ export default function AuthPage({ navigation, route }: any) {
         return;
       }
 
+      setPendingWalletLogin(false);
       const nonce = await backendApi.issueWalletNonce({ walletAddress: connection.address });
       setWalletAddress(nonce.walletAddress);
       setWalletMessage(nonce.message);
@@ -253,6 +258,7 @@ export default function AuthPage({ navigation, route }: any) {
       navigation.replace(routeForEntry(profile, initialRole));
     } catch (error: any) {
       if (isStaleWalletSessionError(error)) {
+        setPendingWalletLogin(false);
         const message = '이전 WalletConnect 세션이 만료되어 초기화했습니다. 다시 지갑을 연결해 주세요.';
         try {
           disconnect('eip155');
@@ -271,6 +277,7 @@ export default function AuthPage({ navigation, route }: any) {
       const message = error?.response
         ? errorMessage(error, '지갑 로그인에 실패했습니다.')
         : walletClientMessage(error, '지갑 인증에 실패했습니다.');
+      setPendingWalletLogin(false);
       setWalletStep('idle');
       setFeedback({ type: 'error', message });
       showWalletAlert(isLogin ? '지갑 로그인 실패' : '지갑 회원가입 실패', message);
@@ -278,6 +285,19 @@ export default function AuthPage({ navigation, route }: any) {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+    if (!pendingWalletLogin || autoWalletLoginRef.current || loading) return;
+    if (!isConnected || !appKitAddress || !provider || providerType !== 'eip155') return;
+
+    autoWalletLoginRef.current = true;
+    setFeedback({ type: 'success', message: '지갑 연결이 완료되었습니다. 서명 요청을 이어갑니다.' });
+
+    void handleWalletLogin().finally(() => {
+      autoWalletLoginRef.current = false;
+    });
+  }, [appKitAddress, isConnected, loading, pendingWalletLogin, provider, providerType]);
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.container}>
