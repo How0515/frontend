@@ -201,6 +201,8 @@ export default function EventCreatePage({ navigation }: any) {
   const [globalSaleEndTime, setGlobalSaleEndTime] = useState('21:00');
   const [roundSaleOverrideEnabled, setRoundSaleOverrideEnabled] = useState(true);
   const [globalSaleExpanded, setGlobalSaleExpanded] = useState(true);
+  const [globalSaleCompleted, setGlobalSaleCompleted] = useState(false);
+  const [saleRoundCompletedIds, setSaleRoundCompletedIds] = useState<Record<string, boolean>>({});
   const [activeSaleRoundId, setActiveSaleRoundId] = useState<string | null>(null);
   const [saleRoundErrors, setSaleRoundErrors] = useState<Record<string, string[]>>({});
   const [roundAcknowledgedIds, setRoundAcknowledgedIds] = useState<Record<string, boolean>>({});
@@ -215,6 +217,7 @@ export default function EventCreatePage({ navigation }: any) {
       const nextRounds = current.map((round) => (round.id === id ? { ...round, ...patch } : round));
       if (patch.saleStartDate || patch.saleStartTime || patch.saleEndDate || patch.saleEndTime) {
         setSaleRoundErrors((current) => ({ ...current, [id]: [] }));
+        setSaleRoundCompletedIds((current) => ({ ...current, [id]: false }));
       }
       if (patch.eventDate || patch.startTime || patch.endTime) {
         setRoundAcknowledgedIds((current) => ({ ...current, [id]: false }));
@@ -267,7 +270,7 @@ export default function EventCreatePage({ navigation }: any) {
     const messages: string[] = [];
     const saleStart = toDateTimeIso(round.saleStartDate, round.saleStartTime);
     const saleEnd = toDateTimeIso(round.saleEndDate, round.saleEndTime);
-    const roundEnd = roundEndIso(round);
+    const roundStart = roundStartIso(round);
 
     if (saleStart < new Date().toISOString()) {
       messages.push('판매 시작 일시는 현재 시각보다 빠를 수 없습니다.');
@@ -275,13 +278,16 @@ export default function EventCreatePage({ navigation }: any) {
     if (saleEnd < saleStart) {
       messages.push('판매 종료 일시는 시작 일시보다 빨라야 합니다.');
     }
-    if (saleEnd > roundEnd) {
-      messages.push('판매 종료 일시는 공연 종료 일시를 넘을 수 없습니다.');
+    if (saleEnd > roundStart) {
+      messages.push('판매 종료 일시는 공연 시작 일시보다 빠르거나 같아야 합니다.');
     }
 
     setSaleRoundErrors((current) => ({ ...current, [round.id]: messages }));
     if (messages.length === 0) {
+      setSaleRoundCompletedIds((current) => ({ ...current, [round.id]: true }));
       setActiveSaleRoundId(null);
+    } else {
+      setSaleRoundCompletedIds((current) => ({ ...current, [round.id]: false }));
     }
   };
 
@@ -297,14 +303,17 @@ export default function EventCreatePage({ navigation }: any) {
       messages.push('전체 판매 종료 일시는 시작 일시보다 빨라야 합니다.');
     }
     rounds.forEach((round, index) => {
-      if (globalEnd > roundEndIso(round)) {
-        messages.push(`${index + 1}회차의 공연 종료 이후까지 판매될 수 없습니다.`);
+      if (globalEnd > roundStartIso(round)) {
+        messages.push(`${index + 1}회차 판매 종료 일시는 공연 시작 일시보다 빠르거나 같아야 합니다.`);
       }
     });
 
     setSaleMessages(messages);
     if (messages.length === 0) {
+      setGlobalSaleCompleted(true);
       setGlobalSaleExpanded(false);
+    } else {
+      setGlobalSaleCompleted(false);
     }
   };
 
@@ -327,21 +336,25 @@ export default function EventCreatePage({ navigation }: any) {
 
   const updateGlobalSaleStartDate = (date: string) => {
     setGlobalSaleStart(date);
+    setGlobalSaleCompleted(false);
     syncGlobalSaleToRounds(date, globalSaleStartTime, globalSaleEnd, globalSaleEndTime);
   };
 
   const updateGlobalSaleStartTime = (time: string) => {
     setGlobalSaleStartTime(time);
+    setGlobalSaleCompleted(false);
     syncGlobalSaleToRounds(globalSaleStart, time, globalSaleEnd, globalSaleEndTime);
   };
 
   const updateGlobalSaleEndDate = (date: string) => {
     setGlobalSaleEnd(date);
+    setGlobalSaleCompleted(false);
     syncGlobalSaleToRounds(globalSaleStart, globalSaleStartTime, date, globalSaleEndTime);
   };
 
   const updateGlobalSaleEndTime = (time: string) => {
     setGlobalSaleEndTime(time);
+    setGlobalSaleCompleted(false);
     syncGlobalSaleToRounds(globalSaleStart, globalSaleStartTime, globalSaleEnd, time);
   };
 
@@ -351,6 +364,8 @@ export default function EventCreatePage({ navigation }: any) {
     setActiveSaleRoundId(null);
     setSaleMessages([]);
     setSaleRoundErrors({});
+    setGlobalSaleCompleted(false);
+    setSaleRoundCompletedIds({});
     setRounds((current) => current.map((round) => ({
       ...round,
       useGlobalSalePeriod: !enabled,
@@ -465,13 +480,13 @@ export default function EventCreatePage({ navigation }: any) {
       if (roundSaleOverrideEnabled) {
         const saleRoundMessages: string[] = [];
         if (saleStart < new Date().toISOString()) {
-          saleRoundMessages.push('판매 시작 일시는 현재 시각보다 빠를 수 없습니다.' );
+          saleRoundMessages.push('판매 시작 일시는 현재 시각보다 빠를 수 없습니다.');
         }
         if (saleEnd < saleStart) {
           saleRoundMessages.push('판매 종료 일시는 시작 일시보다 빨라야 합니다.');
         }
-        if (saleEnd > endsAt.toISOString()) {
-          saleRoundMessages.push('판매 종료 일시는 공연 종료 일시를 넘을 수 없습니다.');
+        if (saleEnd > startsAt.toISOString()) {
+          saleRoundMessages.push('판매 종료 일시는 공연 시작 일시보다 빠르거나 같아야 합니다.');
         }
         nextSaleRoundErrors[round.id] = saleRoundMessages;
       } else {
@@ -483,8 +498,8 @@ export default function EventCreatePage({ navigation }: any) {
           nextSaleMessages.push(`${roundNumber}회차 판매 시작 일시는 판매 종료 일시보다 빨라야 합니다.`);
           nextInvalid.globalSale = true;
         }
-        if (saleEnd > endsAt.toISOString()) {
-          nextSaleMessages.push(`${roundNumber}회차 판매 종료 일시는 공연 종료 일시를 넘을 수 없습니다.`);
+        if (saleEnd > startsAt.toISOString()) {
+          nextSaleMessages.push(`${roundNumber}회차 판매 종료 일시는 공연 시작 일시보다 빠르거나 같아야 합니다.`);
           nextInvalid.globalSale = true;
         }
       }
@@ -512,21 +527,25 @@ export default function EventCreatePage({ navigation }: any) {
         nextInvalid.globalSale = true;
       }
       ranges.forEach((range, index) => {
-        if (globalEnd > range.endsAt.toISOString()) {
-          nextSaleMessages.push(`${index + 1}회차의 공연 종료 이후까지 판매될 수 없습니다.`);
+        if (globalEnd > range.startsAt.toISOString()) {
+          nextSaleMessages.push(`${index + 1}회차 판매 종료 일시는 공연 시작 일시보다 빠르거나 같아야 합니다.`);
           nextInvalid.globalSale = true;
         }
       });
     }
 
-    const hasBlockingIssues = nextErrors.length > 0 || nextSaleMessages.length > 0;
+    const hasBlockingIssues = nextErrors.length > 0 || nextSaleMessages.length > 0 || Object.values(nextSaleRoundErrors).some((messages) => messages.length > 0);
 
     setErrors(nextErrors);
     setInvalidFields(nextInvalid);
     setRoundMessages(nextRoundMessages);
-    setSaleMessages(nextSaleMessages);
+    if (!roundSaleOverrideEnabled) {
+      setSaleMessages(nextSaleMessages);
+      setSaleRoundErrors({});
+    }
     if (roundSaleOverrideEnabled) {
       setSaleRoundErrors(nextSaleRoundErrors);
+      setSaleMessages([]);
     }
     if (hasBlockingIssues) {
       if (nextInvalid.rounds) setExpandedRoundIds(rounds.map((round) => round.id));
