@@ -2,6 +2,7 @@ import React, { useMemo, useRef, useState } from 'react';
 import * as ImagePicker from 'expo-image-picker';
 import {
   Alert,
+  Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -39,20 +40,13 @@ const EVENT_CATEGORIES = [
   { value: 'ETC', label: '기타' },
 ];
 
-const TIME_OPTIONS = Array.from({ length: 32 }, (_, index) => {
-  const totalMinutes = 8 * 60 + index * 30;
-  const hour = Math.floor(totalMinutes / 60);
-  const minute = totalMinutes % 60;
-  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
-});
-
 const FIELD_OFFSET: Record<string, number> = {
-  category: 120,
-  name: 210,
-  venue: 310,
-  description: 540,
-  globalSale: 690,
-  rounds: 980,
+  category: 110,
+  name: 190,
+  venue: 285,
+  description: 390,
+  globalSale: 650,
+  rounds: 870,
 };
 
 function localDate(date: Date) {
@@ -64,6 +58,12 @@ function addDays(value: string, days: number) {
   const date = new Date(`${value}T00:00:00`);
   date.setDate(date.getDate() + days);
   return localDate(date);
+}
+
+function formatShortDate(value: string) {
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return value || '-';
+  return `${date.getMonth() + 1}/${date.getDate()}`;
 }
 
 function toStartOfDayIso(date: string) {
@@ -82,11 +82,27 @@ function roundEndIso(round: EventRoundDraft) {
   return new Date(`${round.eventDate}T${round.endTime}:00`).toISOString();
 }
 
-function buildRound(index: number, baseDate: string, globalSaleStart: string, globalSaleEnd: string): EventRoundDraft {
+function minutesOf(time: string) {
+  const [hour, minute] = time.split(':').map(Number);
+  return hour * 60 + minute;
+}
+
+function timeFromMinutes(total: number) {
+  const clamped = Math.max(0, Math.min(23 * 60 + 30, total));
+  const hour = Math.floor(clamped / 60);
+  const minute = clamped % 60;
+  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+}
+
+function adjustTime(time: string, delta: number) {
+  return timeFromMinutes(minutesOf(time) + delta);
+}
+
+function buildRound(index: number, eventDate: string, globalSaleStart: string, globalSaleEnd: string): EventRoundDraft {
   return {
     id: `${Date.now()}-${index}-${Math.random().toString(16).slice(2)}`,
     title: `${index + 1}회차`,
-    eventDate: addDays(baseDate, index),
+    eventDate,
     startTime: index === 0 ? '19:00' : '14:00',
     endTime: index === 0 ? '21:00' : '16:00',
     useGlobalSalePeriod: true,
@@ -108,15 +124,18 @@ export default function EventCreatePage({ navigation }: any) {
   const defaultSaleStart = useMemo(() => addDays(today, 1), [today]);
   const defaultSaleEnd = useMemo(() => addDays(defaultEventDate, -1), [defaultEventDate]);
 
+  const initialRound = useMemo(() => buildRound(0, defaultEventDate, defaultSaleStart, defaultSaleEnd), [defaultEventDate, defaultSaleEnd, defaultSaleStart]);
   const [category, setCategory] = useState('CONCERT');
   const [name, setName] = useState('');
   const [venue, setVenue] = useState('');
   const [venuePlaceId] = useState<string | null>(null);
   const [description, setDescription] = useState('');
+  const [descriptionHeight, setDescriptionHeight] = useState(104);
   const [poster, setPoster] = useState<PosterAsset | null>(null);
   const [globalSaleStart, setGlobalSaleStart] = useState(defaultSaleStart);
   const [globalSaleEnd, setGlobalSaleEnd] = useState(defaultSaleEnd);
-  const [rounds, setRounds] = useState<EventRoundDraft[]>([buildRound(0, defaultEventDate, defaultSaleStart, defaultSaleEnd)]);
+  const [rounds, setRounds] = useState<EventRoundDraft[]>([initialRound]);
+  const [expandedRoundIds, setExpandedRoundIds] = useState<string[]>([initialRound.id]);
   const [errors, setErrors] = useState<string[]>([]);
   const [invalidFields, setInvalidFields] = useState<Record<string, boolean>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -125,15 +144,22 @@ export default function EventCreatePage({ navigation }: any) {
     setRounds((current) => current.map((round) => (round.id === id ? { ...round, ...patch } : round)));
   };
 
+  const toggleRound = (id: string) => {
+    setExpandedRoundIds((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
+  };
+
   const addRound = () => {
     setRounds((current) => {
-      const next = buildRound(current.length, addDays(current.at(-1)?.eventDate || defaultEventDate, 1), globalSaleStart, globalSaleEnd);
-      return [...current, { ...next, eventDate: addDays(current.at(-1)?.eventDate || defaultEventDate, 1) }];
+      const nextDate = addDays(current.at(-1)?.eventDate || defaultEventDate, 1);
+      const next = buildRound(current.length, nextDate, globalSaleStart, globalSaleEnd);
+      setExpandedRoundIds([next.id]);
+      return [...current, next];
     });
   };
 
   const removeRound = (id: string) => {
     setRounds((current) => current.filter((round) => round.id !== id).map((round, index) => ({ ...round, title: `${index + 1}회차` })));
+    setExpandedRoundIds((current) => current.filter((item) => item !== id));
   };
 
   const pickPoster = async () => {
@@ -222,6 +248,7 @@ export default function EventCreatePage({ navigation }: any) {
     setInvalidFields(nextInvalid);
     if (nextErrors.length > 0) {
       const firstField = Object.keys(FIELD_OFFSET).find((field) => nextInvalid[field]);
+      if (nextInvalid.rounds) setExpandedRoundIds(rounds.map((round) => round.id));
       scrollRef.current?.scrollTo({ y: FIELD_OFFSET[firstField || 'category'], animated: true });
       return false;
     }
@@ -311,7 +338,7 @@ export default function EventCreatePage({ navigation }: any) {
       <ScrollView ref={scrollRef} style={styles.container} contentContainerStyle={styles.content}>
         <Text style={styles.eyebrow}>Event Create</Text>
         <Text style={styles.title}>이벤트 등록</Text>
-        <Text style={styles.subtitle}>기본 정보와 회차 운영 정보를 먼저 등록하고, 가격과 좌석 정책은 다음 단계에서 설정합니다.</Text>
+        <Text style={styles.subtitle}>이벤트 기본 정보와 회차를 먼저 만들고, 가격과 좌석 정책은 다음 단계에서 설정합니다.</Text>
 
         <View style={styles.card}>
           <Text style={styles.label}>카테고리</Text>
@@ -329,22 +356,33 @@ export default function EventCreatePage({ navigation }: any) {
 
           <Text style={styles.label}>장소</Text>
           <TextInput style={[styles.input, invalidFields.venue && styles.invalidInput]} value={venue} onChangeText={setVenue} placeholder="예: 올림픽공원 KSPO DOME" />
-          <Text style={styles.helpText}>현재는 직접 입력하며, 추후 placeId 기반 지도 검색과 연결할 수 있는 구조로 저장됩니다.</Text>
-
-          <Text style={styles.label}>포스터</Text>
-          <TouchableOpacity style={styles.posterButton} onPress={pickPoster}>
-            <Text style={styles.posterButtonText}>{poster ? poster.fileName || '선택된 이미지' : '파일 선택'}</Text>
-          </TouchableOpacity>
-          <Text style={styles.helpText}>선택 사항입니다. 이미지 없이도 이벤트를 생성할 수 있습니다.</Text>
+          <Text style={styles.helpText}>공연장 이름 또는 행사 장소를 입력해주세요.</Text>
 
           <Text style={styles.label}>이벤트 소개</Text>
           <TextInput
-            style={[styles.input, styles.textArea, invalidFields.description && styles.invalidInput]}
+            style={[styles.input, styles.textArea, { height: descriptionHeight }, invalidFields.description && styles.invalidInput]}
             value={description}
             onChangeText={setDescription}
+            onContentSizeChange={(event) => setDescriptionHeight(Math.max(104, Math.min(220, event.nativeEvent.contentSize.height + 18)))}
             placeholder="공연 소개, 출연진, 운영 시간, 입장 안내, 주의사항 등을 입력해주세요."
             multiline
           />
+
+          <Text style={styles.label}>포스터</Text>
+          <View style={styles.posterRow}>
+            {poster ? <Image source={{ uri: poster.uri }} style={styles.posterPreview} /> : <View style={styles.posterPlaceholder}><Text style={styles.posterPlaceholderText}>No Image</Text></View>}
+            <View style={styles.posterActions}>
+              <TouchableOpacity style={styles.posterButton} onPress={pickPoster}>
+                <Text style={styles.posterButtonText}>{poster ? '이미지 변경' : '파일 선택'}</Text>
+              </TouchableOpacity>
+              {poster ? (
+                <TouchableOpacity style={styles.removePosterButton} onPress={() => setPoster(null)}>
+                  <Text style={styles.removePosterText}>삭제</Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+          </View>
+          <Text style={styles.helpText}>선택 사항입니다. 이미지 없이도 이벤트를 생성할 수 있습니다.</Text>
         </View>
 
         <View style={styles.card}>
@@ -358,39 +396,52 @@ export default function EventCreatePage({ navigation }: any) {
         </View>
 
         <View style={styles.card}>
-          <View style={styles.sectionHead}>
-            <Text style={styles.cardTitle}>회차</Text>
-            <TouchableOpacity style={styles.smallButton} onPress={addRound}>
-              <Text style={styles.smallButtonText}>+ 회차 추가</Text>
-            </TouchableOpacity>
-          </View>
-          {rounds.map((round, index) => (
-            <View key={round.id} style={[styles.roundBox, invalidFields.rounds && styles.invalidRound]}>
-              <View style={styles.sectionHead}>
-                <Text style={styles.roundTitle}>{index + 1}회차</Text>
-                {rounds.length > 1 ? (
-                  <TouchableOpacity onPress={() => removeRound(round.id)}>
-                    <Text style={styles.deleteText}>회차 삭제</Text>
-                  </TouchableOpacity>
+          <Text style={styles.cardTitle}>회차</Text>
+          {rounds.map((round, index) => {
+            const expanded = expandedRoundIds.includes(round.id);
+            return (
+              <View key={round.id} style={[styles.roundBox, invalidFields.rounds && styles.invalidRound]}>
+                <TouchableOpacity style={styles.roundHeader} onPress={() => toggleRound(round.id)} activeOpacity={0.8}>
+                  <View style={styles.roundHeaderCopy}>
+                    <Text style={styles.roundTitle}>{index + 1}회차 · {formatShortDate(round.eventDate)} {round.startTime}</Text>
+                    <Text style={styles.roundSummary}>{round.startTime} ~ {round.endTime} · {round.useGlobalSalePeriod ? '기본 판매 기간' : '회차별 판매 기간'}</Text>
+                  </View>
+                  <View style={styles.roundHeaderActions}>
+                    {rounds.length > 1 ? (
+                      <TouchableOpacity style={styles.deleteButton} onPress={() => removeRound(round.id)}>
+                        <Text style={styles.deleteText}>삭제</Text>
+                      </TouchableOpacity>
+                    ) : null}
+                    <Text style={styles.collapseIcon}>{expanded ? '접기' : '펼치기'}</Text>
+                  </View>
+                </TouchableOpacity>
+
+                {expanded ? (
+                  <View style={styles.roundBody}>
+                    <Text style={styles.label}>공연일</Text>
+                    <SingleDatePicker value={round.eventDate} onChange={(value) => updateRound(round.id, { eventDate: value })} />
+
+                    <View style={styles.timeFieldGrid}>
+                      <TimeField label="시작 시간" value={round.startTime} onChange={(value) => updateRound(round.id, { startTime: value })} />
+                      <TimeField label="종료 시간" value={round.endTime} onChange={(value) => updateRound(round.id, { endTime: value })} />
+                    </View>
+
+                    <TouchableOpacity style={styles.checkRow} onPress={() => updateRound(round.id, { useGlobalSalePeriod: !round.useGlobalSalePeriod })}>
+                      <Text style={[styles.checkbox, round.useGlobalSalePeriod && styles.checkedBox]}>{round.useGlobalSalePeriod ? '✓' : ''}</Text>
+                      <Text style={styles.checkLabel}>이벤트 기본 판매 기간 사용</Text>
+                    </TouchableOpacity>
+                    {!round.useGlobalSalePeriod ? (
+                      <CalendarRange startDate={round.saleStartDate} endDate={round.saleEndDate} onChange={(start, end) => updateRound(round.id, { saleStartDate: start, saleEndDate: end })} />
+                    ) : null}
+                  </View>
                 ) : null}
               </View>
-              <Text style={styles.label}>공연일</Text>
-              <SingleDatePicker value={round.eventDate} onChange={(value) => updateRound(round.id, { eventDate: value })} />
-              <Text style={styles.label}>시간</Text>
-              <View style={styles.timeRow}>
-                <TimeSelect value={round.startTime} onChange={(value) => updateRound(round.id, { startTime: value })} />
-                <Text style={styles.timeDivider}>~</Text>
-                <TimeSelect value={round.endTime} onChange={(value) => updateRound(round.id, { endTime: value })} />
-              </View>
-              <TouchableOpacity style={styles.checkRow} onPress={() => updateRound(round.id, { useGlobalSalePeriod: !round.useGlobalSalePeriod })}>
-                <Text style={[styles.checkbox, round.useGlobalSalePeriod && styles.checkedBox]}>{round.useGlobalSalePeriod ? '✓' : ''}</Text>
-                <Text style={styles.checkLabel}>이벤트 기본 판매 기간 사용</Text>
-              </TouchableOpacity>
-              {!round.useGlobalSalePeriod ? (
-                <CalendarRange startDate={round.saleStartDate} endDate={round.saleEndDate} onChange={(start, end) => updateRound(round.id, { saleStartDate: start, saleEndDate: end })} />
-              ) : null}
-            </View>
-          ))}
+            );
+          })}
+
+          <TouchableOpacity style={styles.addRoundButton} onPress={addRound}>
+            <Text style={styles.addRoundButtonText}>+ 회차 추가</Text>
+          </TouchableOpacity>
         </View>
 
         {errors.length > 0 ? (
@@ -448,72 +499,121 @@ function CalendarRange({ startDate, endDate, onChange }: { startDate: string; en
 }
 
 function SingleDatePicker({ value, onChange }: { value: string; onChange: (date: string) => void }) {
-  return <CalendarRange startDate={value} endDate={value} onChange={(start) => onChange(start)} />;
+  const selected = new Date(`${value}T00:00:00`);
+  const week = Array.from({ length: 7 }, (_, index) => localDate(new Date(selected.getFullYear(), selected.getMonth(), selected.getDate() - 3 + index)));
+  return (
+    <View style={styles.singleDateBox}>
+      <View style={styles.singleDateHeader}>
+        <TouchableOpacity style={styles.dateMoveButton} onPress={() => onChange(addDays(value, -1))}>
+          <Text style={styles.dateMoveText}>이전</Text>
+        </TouchableOpacity>
+        <Text style={styles.singleDateValue}>공연일 {value}</Text>
+        <TouchableOpacity style={styles.dateMoveButton} onPress={() => onChange(addDays(value, 1))}>
+          <Text style={styles.dateMoveText}>다음</Text>
+        </TouchableOpacity>
+      </View>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dateStrip}>
+        {week.map((date) => (
+          <TouchableOpacity key={date} style={[styles.datePill, date === value && styles.activeDatePill]} onPress={() => onChange(date)}>
+            <Text style={[styles.datePillText, date === value && styles.activeDatePillText]}>{formatShortDate(date)}</Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+    </View>
+  );
 }
 
-function TimeSelect({ value, onChange }: { value: string; onChange: (time: string) => void }) {
+function TimeField({ label, value, onChange }: { label: string; value: string; onChange: (time: string) => void }) {
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.timeList}>
-      {TIME_OPTIONS.map((time) => (
-        <TouchableOpacity key={time} style={[styles.timeChip, value === time && styles.activeTimeChip]} onPress={() => onChange(time)}>
-          <Text style={[styles.timeChipText, value === time && styles.activeTimeChipText]}>{time}</Text>
+    <View style={styles.timeField}>
+      <Text style={styles.timeLabel}>{label}</Text>
+      <View style={styles.timeStepper}>
+        <TouchableOpacity style={styles.timeStepButton} onPress={() => onChange(adjustTime(value, -30))}>
+          <Text style={styles.timeStepText}>-30</Text>
         </TouchableOpacity>
-      ))}
-    </ScrollView>
+        <Text style={styles.timeValue}>{value}</Text>
+        <TouchableOpacity style={styles.timeStepButton} onPress={() => onChange(adjustTime(value, 30))}>
+          <Text style={styles.timeStepText}>+30</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   keyboard: { flex: 1 },
   container: { flex: 1, backgroundColor: '#F4F7FB' },
-  content: { padding: 18, paddingBottom: 96 },
+  content: { padding: 16, paddingBottom: 88 },
   eyebrow: { color: '#2563EB', fontWeight: '800', fontSize: 12 },
-  title: { marginTop: 4, fontSize: 28, fontWeight: '900', color: '#0F172A' },
-  subtitle: { marginTop: 8, color: '#64748B', fontSize: 14, lineHeight: 21 },
-  card: { marginTop: 16, backgroundColor: '#FFFFFF', borderRadius: 8, padding: 16, borderWidth: 1, borderColor: '#E2E8F0' },
-  cardTitle: { color: '#0F172A', fontSize: 17, fontWeight: '900' },
-  label: { marginTop: 12, marginBottom: 6, color: '#334155', fontSize: 13, fontWeight: '800' },
-  helpText: { marginTop: 6, color: '#64748B', fontSize: 12, lineHeight: 18 },
-  categoryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  categoryChip: { borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: '#FFFFFF' },
+  title: { marginTop: 3, fontSize: 27, fontWeight: '900', color: '#0F172A' },
+  subtitle: { marginTop: 6, color: '#64748B', fontSize: 13, lineHeight: 19 },
+  card: { marginTop: 12, backgroundColor: '#FFFFFF', borderRadius: 8, padding: 14, borderWidth: 1, borderColor: '#E2E8F0' },
+  cardTitle: { color: '#0F172A', fontSize: 16, fontWeight: '900' },
+  label: { marginTop: 10, marginBottom: 5, color: '#334155', fontSize: 13, fontWeight: '800' },
+  helpText: { marginTop: 5, color: '#64748B', fontSize: 12, lineHeight: 17 },
+  categoryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
+  categoryChip: { borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 999, paddingHorizontal: 11, paddingVertical: 7, backgroundColor: '#FFFFFF' },
   activeCategoryChip: { borderColor: '#2563EB', backgroundColor: '#EFF6FF' },
   categoryChipText: { color: '#475569', fontWeight: '800', fontSize: 13 },
   activeCategoryChipText: { color: '#2563EB' },
-  input: { borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, padding: 12, backgroundColor: '#FFFFFF', color: '#0F172A' },
+  input: { borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, padding: 11, backgroundColor: '#FFFFFF', color: '#0F172A' },
   invalidInput: { borderColor: '#DC2626', backgroundColor: '#FEF2F2' },
-  textArea: { minHeight: 120, textAlignVertical: 'top' },
-  posterButton: { borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, padding: 13, backgroundColor: '#FFFFFF' },
+  textArea: { minHeight: 104, maxHeight: 220, textAlignVertical: 'top' },
+  posterRow: { flexDirection: 'row', gap: 10, alignItems: 'center' },
+  posterPreview: { width: 72, height: 96, borderRadius: 8, backgroundColor: '#E2E8F0' },
+  posterPlaceholder: { width: 72, height: 96, borderRadius: 8, borderWidth: 1, borderColor: '#CBD5E1', backgroundColor: '#F8FAFC', alignItems: 'center', justifyContent: 'center' },
+  posterPlaceholderText: { color: '#94A3B8', fontSize: 11, fontWeight: '900' },
+  posterActions: { flex: 1, gap: 8 },
+  posterButton: { borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, padding: 12, backgroundColor: '#FFFFFF', alignItems: 'center' },
   posterButtonText: { color: '#0F172A', fontWeight: '900' },
-  calendar: { marginTop: 12, borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 8, padding: 10, backgroundColor: '#F8FAFC' },
-  calendarTitle: { color: '#0F172A', fontWeight: '900', marginBottom: 8 },
+  removePosterButton: { borderWidth: 1, borderColor: '#FCA5A5', borderRadius: 8, padding: 10, backgroundColor: '#FEF2F2', alignItems: 'center' },
+  removePosterText: { color: '#DC2626', fontWeight: '900' },
+  calendar: { marginTop: 10, borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 8, padding: 9, backgroundColor: '#F8FAFC' },
+  calendarTitle: { color: '#0F172A', fontWeight: '900', marginBottom: 7 },
   weekRow: { flexDirection: 'row' },
   weekText: { width: `${100 / 7}%`, textAlign: 'center', color: '#64748B', fontSize: 11, fontWeight: '900' },
-  dayGrid: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 6 },
-  dayCell: { width: `${100 / 7}%`, aspectRatio: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 6 },
+  dayGrid: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 5 },
+  dayCell: { width: `${100 / 7}%`, aspectRatio: 1.1, alignItems: 'center', justifyContent: 'center', borderRadius: 6 },
   selectedDay: { backgroundColor: '#2563EB' },
   rangeDay: { backgroundColor: '#DBEAFE' },
   dayText: { color: '#0F172A', fontWeight: '800', fontSize: 12 },
   selectedDayText: { color: '#FFFFFF' },
-  rangeText: { marginTop: 8, color: '#475569', fontSize: 12, fontWeight: '800' },
-  sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12 },
-  smallButton: { borderRadius: 8, backgroundColor: '#2563EB', paddingHorizontal: 12, paddingVertical: 8 },
-  smallButtonText: { color: '#FFFFFF', fontSize: 12, fontWeight: '900' },
-  roundBox: { marginTop: 14, borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 8, padding: 12, backgroundColor: '#FFFFFF' },
+  rangeText: { marginTop: 7, color: '#475569', fontSize: 12, fontWeight: '800' },
+  roundBox: { marginTop: 10, borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 8, backgroundColor: '#FFFFFF' },
   invalidRound: { borderColor: '#FCA5A5', backgroundColor: '#FFF7F7' },
-  roundTitle: { color: '#0F172A', fontSize: 16, fontWeight: '900' },
+  roundHeader: { padding: 12, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 },
+  roundHeaderCopy: { flex: 1 },
+  roundTitle: { color: '#0F172A', fontSize: 15, fontWeight: '900' },
+  roundSummary: { marginTop: 4, color: '#64748B', fontSize: 12, fontWeight: '700' },
+  roundHeaderActions: { alignItems: 'flex-end', gap: 6 },
+  deleteButton: { borderWidth: 1, borderColor: '#FCA5A5', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 5, backgroundColor: '#FEF2F2' },
   deleteText: { color: '#DC2626', fontWeight: '900', fontSize: 12 },
-  timeRow: { gap: 8 },
-  timeDivider: { alignSelf: 'center', color: '#64748B', fontWeight: '900', marginVertical: 4 },
-  timeList: { gap: 8, paddingVertical: 4 },
-  timeChip: { borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 9, backgroundColor: '#FFFFFF' },
-  activeTimeChip: { borderColor: '#2563EB', backgroundColor: '#EFF6FF' },
-  timeChipText: { color: '#475569', fontSize: 12, fontWeight: '900' },
-  activeTimeChipText: { color: '#2563EB' },
-  checkRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12 },
+  collapseIcon: { color: '#2563EB', fontSize: 12, fontWeight: '900' },
+  roundBody: { borderTopWidth: 1, borderTopColor: '#F1F5F9', padding: 12, paddingTop: 4 },
+  singleDateBox: { borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 8, backgroundColor: '#F8FAFC', padding: 9 },
+  singleDateHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  singleDateValue: { flex: 1, textAlign: 'center', color: '#0F172A', fontWeight: '900', fontSize: 13 },
+  dateMoveButton: { borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7, backgroundColor: '#FFFFFF' },
+  dateMoveText: { color: '#475569', fontWeight: '900', fontSize: 12 },
+  dateStrip: { gap: 7, paddingTop: 9 },
+  datePill: { borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: '#FFFFFF' },
+  activeDatePill: { borderColor: '#2563EB', backgroundColor: '#2563EB' },
+  datePillText: { color: '#475569', fontSize: 12, fontWeight: '900' },
+  activeDatePillText: { color: '#FFFFFF' },
+  timeFieldGrid: { gap: 9, marginTop: 10 },
+  timeField: { borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 8, padding: 10, backgroundColor: '#F8FAFC' },
+  timeLabel: { color: '#64748B', fontSize: 12, fontWeight: '900', marginBottom: 8 },
+  timeStepper: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  timeStepButton: { width: 54, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, paddingVertical: 9, alignItems: 'center', backgroundColor: '#FFFFFF' },
+  timeStepText: { color: '#2563EB', fontWeight: '900', fontSize: 12 },
+  timeValue: { flex: 1, textAlign: 'center', color: '#0F172A', fontSize: 18, fontWeight: '900' },
+  checkRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 },
   checkbox: { width: 22, height: 22, borderRadius: 4, borderWidth: 1, borderColor: '#CBD5E1', textAlign: 'center', color: '#FFFFFF', fontWeight: '900', lineHeight: 20 },
   checkedBox: { backgroundColor: '#2563EB', borderColor: '#2563EB' },
   checkLabel: { color: '#0F172A', fontWeight: '800' },
-  errorPanel: { marginTop: 16, borderWidth: 1, borderColor: '#FCA5A5', backgroundColor: '#FEF2F2', borderRadius: 8, padding: 12 },
+  addRoundButton: { borderWidth: 1, borderColor: '#2563EB', borderRadius: 8, paddingVertical: 13, alignItems: 'center', marginTop: 12, backgroundColor: '#EFF6FF' },
+  addRoundButtonText: { color: '#2563EB', fontSize: 15, fontWeight: '900' },
+  errorPanel: { marginTop: 14, borderWidth: 1, borderColor: '#FCA5A5', backgroundColor: '#FEF2F2', borderRadius: 8, padding: 12 },
   errorTitle: { color: '#B91C1C', fontWeight: '900', marginBottom: 6 },
   errorItem: { color: '#B91C1C', fontWeight: '800', lineHeight: 20 },
   primaryButton: { backgroundColor: '#2563EB', borderRadius: 8, paddingVertical: 15, alignItems: 'center', marginTop: 12 },
