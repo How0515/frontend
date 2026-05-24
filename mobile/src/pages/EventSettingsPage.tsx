@@ -1,8 +1,10 @@
 import React, { useCallback, useMemo, useState } from 'react';
+import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect } from '@react-navigation/native';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { errorMessage } from '../lib/account';
 import { backendApi } from '../lib/backend';
+import { config } from '../lib/config';
 import type { EventDetail, EventRound } from '../types/api';
 
 type RoundDraft = {
@@ -14,6 +16,12 @@ type RoundDraft = {
   useGlobalSalePeriod: boolean;
   saleStartDate: string;
   saleEndDate: string;
+};
+
+type PosterAsset = {
+  uri: string;
+  fileName?: string | null;
+  mimeType?: string | null;
 };
 
 const EVENT_CATEGORIES = [
@@ -56,6 +64,22 @@ function roundStartIso(round: RoundDraft) {
 
 function roundEndIso(round: RoundDraft) {
   return new Date(`${round.eventDate}T${round.endTime}:00`).toISOString();
+}
+
+function posterFile(asset: PosterAsset) {
+  const fallbackName = asset.uri.split('/').pop() || `event-poster-${Date.now()}.jpg`;
+  return {
+    uri: asset.uri,
+    name: asset.fileName || fallbackName,
+    type: asset.mimeType || 'image/jpeg',
+  };
+}
+
+function imageSourceUri(value: string) {
+  if (!value) return '';
+  if (/^(https?:|file:|data:)/i.test(value)) return value;
+  const apiRoot = config.apiBaseUrl.replace(/\/api\/v1\/?$/, '');
+  return `${apiRoot}${value.startsWith('/') ? '' : '/'}${value}`;
 }
 
 function defaultSaleEnd(rounds: RoundDraft[]) {
@@ -103,6 +127,9 @@ export default function EventSettingsPage({ navigation, route }: any) {
   const [venue, setVenue] = useState('');
   const [description, setDescription] = useState('');
   const [imageUrl, setImageUrl] = useState('');
+  const [poster, setPoster] = useState<PosterAsset | null>(null);
+  const [posterRemoved, setPosterRemoved] = useState(false);
+  const [posterPreviewOpen, setPosterPreviewOpen] = useState(false);
   const [rounds, setRounds] = useState<RoundDraft[]>([]);
   const [expandedRoundIds, setExpandedRoundIds] = useState<string[]>([]);
   const [globalSaleStart, setGlobalSaleStart] = useState(today);
@@ -127,6 +154,9 @@ export default function EventSettingsPage({ navigation, route }: any) {
       setVenue(detail.venue || detail.location?.name || '');
       setDescription(detail.description || '');
       setImageUrl(detail.imageUrl || '');
+      setPoster(null);
+      setPosterRemoved(false);
+      setPosterPreviewOpen(false);
       setRounds(nextRounds);
       setGlobalSaleStart(saleStart);
       setGlobalSaleEnd(saleEnd);
@@ -141,6 +171,28 @@ export default function EventSettingsPage({ navigation, route }: any) {
   }, [eventId, today]);
 
   useFocusEffect(useCallback(() => { void load(); }, [load]));
+
+  const posterPreviewUri = poster?.uri || (!posterRemoved ? imageSourceUri(imageUrl) : '');
+
+  const pickPoster = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert('권한 필요', '포스터 이미지를 선택하려면 사진 접근 권한이 필요합니다.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [3, 4],
+      quality: 0.9,
+    });
+
+    if (!result.canceled && result.assets[0]) {
+      setPoster(result.assets[0]);
+      setPosterRemoved(false);
+    }
+  };
 
   const updateRound = (id: string, patch: Partial<RoundDraft>) => {
     setRounds((current) => {
@@ -249,7 +301,8 @@ export default function EventSettingsPage({ navigation, route }: any) {
         },
         venuePlaceId: event.venuePlaceId || event.location?.placeId || null,
         description: description.trim(),
-        imageUrl: imageUrl.trim() || null,
+        imageUrl: posterRemoved ? null : imageUrl.trim() || null,
+        removeImage: posterRemoved,
         eventAt: roundStartIso(firstRound),
         eventStartAt: roundStartIso(firstRound),
         eventEndAt: roundEndIso(lastRound),
@@ -269,6 +322,9 @@ export default function EventSettingsPage({ navigation, route }: any) {
           saleEndAt: toEndOfDayIso(round.useGlobalSalePeriod ? globalSaleEnd : round.saleEndDate),
         })),
       });
+      if (poster) {
+        await backendApi.uploadEventImage(event.id, posterFile(poster));
+      }
       Alert.alert('저장 완료', '이벤트 정보가 수정되었습니다.');
       await load();
       navigation.navigate('OrganizerEventDetail', { eventId: event.id });
@@ -306,8 +362,34 @@ export default function EventSettingsPage({ navigation, route }: any) {
           <TextInput style={styles.input} value={venue} onChangeText={setVenue} placeholder="예: 올림픽공원 KSPO DOME" />
           <Text style={styles.label}>이벤트 소개</Text>
           <TextInput style={[styles.input, styles.textArea]} value={description} onChangeText={setDescription} multiline />
-          <Text style={styles.label}>포스터 URL</Text>
-          <TextInput style={styles.input} value={imageUrl} onChangeText={setImageUrl} placeholder="https://..." autoCapitalize="none" />
+          <Text style={styles.label}>포스터</Text>
+          {posterPreviewUri ? (
+            <TouchableOpacity activeOpacity={0.88} onPress={() => setPosterPreviewOpen(true)}>
+              <Image source={{ uri: posterPreviewUri }} style={styles.posterPreview} />
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity style={styles.posterPlaceholder} activeOpacity={0.88} onPress={pickPoster}>
+              <Text style={styles.posterPlaceholderText}>포스터 없음</Text>
+            </TouchableOpacity>
+          )}
+          <View style={styles.posterActionRow}>
+            <TouchableOpacity style={styles.posterButton} onPress={pickPoster}>
+              <Text style={styles.posterButtonText}>{posterPreviewUri ? '다른 포스터 등록' : '포스터 등록'}</Text>
+            </TouchableOpacity>
+            {posterPreviewUri ? (
+              <TouchableOpacity
+                style={[styles.posterButton, styles.posterDeleteButton]}
+                onPress={() => {
+                  setPoster(null);
+                  setPosterRemoved(true);
+                  setImageUrl('');
+                }}
+              >
+                <Text style={styles.posterDeleteText}>포스터 제거</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
+          <Text style={styles.helpText}>기존에 업로드한 포스터를 확인하거나 새 파일로 교체할 수 있습니다.</Text>
         </View>
 
         <View style={styles.card}>
@@ -389,6 +471,13 @@ export default function EventSettingsPage({ navigation, route }: any) {
           <Text style={styles.primaryButtonText}>{saving ? '저장 중...' : '수정 완료'}</Text>
         </TouchableOpacity>
       </View>
+
+      <Modal visible={posterPreviewOpen} transparent animationType="fade" onRequestClose={() => setPosterPreviewOpen(false)}>
+        <TouchableOpacity style={styles.previewOverlay} activeOpacity={1} onPress={() => setPosterPreviewOpen(false)}>
+          {posterPreviewUri ? <Image source={{ uri: posterPreviewUri }} style={styles.previewImage} resizeMode="contain" /> : null}
+          <Text style={styles.previewClose}>닫기</Text>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }
@@ -407,6 +496,14 @@ const styles = StyleSheet.create({
   helpText: { marginTop: 5, color: '#64748B', fontSize: 12, lineHeight: 17 },
   input: { borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, padding: 10, backgroundColor: '#FFFFFF', color: '#0F172A' },
   textArea: { minHeight: 76, textAlignVertical: 'top' },
+  posterPreview: { width: '100%', aspectRatio: 3 / 4, borderRadius: 8, backgroundColor: '#E2E8F0' },
+  posterPlaceholder: { minHeight: 86, borderWidth: 1, borderColor: '#CBD5E1', borderStyle: 'dashed', borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F8FAFC' },
+  posterPlaceholderText: { color: '#64748B', fontSize: 13, fontWeight: '800' },
+  posterActionRow: { flexDirection: 'row', gap: 8, marginTop: 9 },
+  posterButton: { flex: 1, borderWidth: 1, borderColor: '#2563EB', borderRadius: 8, paddingVertical: 11, alignItems: 'center', backgroundColor: '#EFF6FF' },
+  posterButtonText: { color: '#2563EB', fontWeight: '900', fontSize: 13 },
+  posterDeleteButton: { borderColor: '#FCA5A5', backgroundColor: '#FFF7F7' },
+  posterDeleteText: { color: '#B91C1C', fontWeight: '900', fontSize: 13 },
   categoryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
   categoryChip: { borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 999, paddingHorizontal: 11, paddingVertical: 7, backgroundColor: '#FFFFFF' },
   activeCategoryChip: { borderColor: '#2563EB', backgroundColor: '#EFF6FF' },
@@ -442,4 +539,7 @@ const styles = StyleSheet.create({
   primaryButton: { backgroundColor: '#2563EB', borderRadius: 8, paddingVertical: 15, alignItems: 'center' },
   primaryButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '900' },
   disabledButton: { opacity: 0.55 },
+  previewOverlay: { flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.92)', alignItems: 'center', justifyContent: 'center', padding: 20 },
+  previewImage: { width: '100%', height: '78%', borderRadius: 8 },
+  previewClose: { marginTop: 16, color: '#FFFFFF', fontWeight: '900', fontSize: 15 },
 });
