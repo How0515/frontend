@@ -48,9 +48,9 @@ const FIELD_OFFSET: Record<string, number> = {
   category: 100,
   name: 170,
   venue: 260,
-  description: 350,
-  rounds: 610,
-  globalSale: 900,
+  description: 330,
+  rounds: 560,
+  globalSale: 860,
 };
 
 function localDate(date: Date) {
@@ -120,11 +120,12 @@ export default function EventCreatePage({ navigation }: any) {
   const [venue, setVenue] = useState('');
   const [venuePlaceId] = useState<string | null>(null);
   const [description, setDescription] = useState('');
-  const [descriptionHeight, setDescriptionHeight] = useState(96);
+  const [descriptionHeight, setDescriptionHeight] = useState(76);
   const [poster, setPoster] = useState<PosterAsset | null>(null);
   const [posterPreviewOpen, setPosterPreviewOpen] = useState(false);
   const [rounds, setRounds] = useState<EventRoundDraft[]>([initialRound]);
   const [expandedRoundIds, setExpandedRoundIds] = useState<string[]>([]);
+  const [roundManageMode, setRoundManageMode] = useState(false);
   const [globalSaleStart, setGlobalSaleStart] = useState(defaultSaleStart);
   const [globalSaleEnd, setGlobalSaleEnd] = useState(defaultSaleEnd);
   const [roundSaleOverrideEnabled, setRoundSaleOverrideEnabled] = useState(false);
@@ -248,7 +249,7 @@ export default function EventCreatePage({ navigation }: any) {
         nextErrors.push(`${roundNumber}회차 시간을 설정해주세요.`);
         nextInvalid.rounds = true;
       } else if (endsAt <= startsAt) {
-        nextErrors.push(`${roundNumber}회차 종료 시간은 시작 시간보다 늦어야 합니다.`);
+        nextErrors.push(`${roundNumber}회차 종료 시간이 시작 시간보다 빠를 수 없습니다. 다음 날 종료 공연은 별도 설정이 필요합니다.`);
         nextInvalid.rounds = true;
       }
       if (!saleStart || !saleEnd || saleEnd < saleStart) {
@@ -366,7 +367,7 @@ export default function EventCreatePage({ navigation }: any) {
       <ScrollView ref={scrollRef} style={styles.container} contentContainerStyle={styles.content}>
         <Text style={styles.eyebrow}>Event Create</Text>
         <Text style={styles.title}>이벤트 등록</Text>
-        <Text style={styles.subtitle}>이벤트 정보를 등록한 후, 다음 단계에서 티켓과 좌석 정보를 설정합니다.</Text>
+        <Text style={styles.subtitle}>이벤트 등록 후 티켓과 좌석 정보를 설정합니다.</Text>
 
         <View style={styles.card}>
           <Text style={styles.label}>카테고리</Text>
@@ -384,37 +385,34 @@ export default function EventCreatePage({ navigation }: any) {
 
           <Text style={styles.label}>장소</Text>
           <TextInput style={[styles.input, invalidFields.venue && styles.invalidInput]} value={venue} onChangeText={setVenue} placeholder="예: 올림픽공원 KSPO DOME" />
-          <Text style={styles.helpText}>공연장 이름 또는 행사 장소를 입력해주세요.</Text>
 
           <Text style={styles.label}>이벤트 소개</Text>
           <TextInput
             style={[styles.input, styles.textArea, { height: descriptionHeight }, invalidFields.description && styles.invalidInput]}
             value={description}
             onChangeText={setDescription}
-            onContentSizeChange={(event) => setDescriptionHeight(Math.max(96, Math.min(200, event.nativeEvent.contentSize.height + 14)))}
+            onContentSizeChange={(event) => setDescriptionHeight(Math.max(76, Math.min(180, event.nativeEvent.contentSize.height + 12)))}
             placeholder="공연 소개, 출연진, 운영 시간, 입장 안내, 주의사항 등을 입력해주세요."
             multiline
           />
 
           <Text style={styles.label}>포스터</Text>
-          <View style={styles.posterRow}>
-            {poster ? (
-              <TouchableOpacity onPress={() => setPosterPreviewOpen(true)} activeOpacity={0.85}>
-                <Image source={{ uri: poster.uri }} style={styles.posterPreview} />
-              </TouchableOpacity>
-            ) : (
-              <View style={styles.posterPlaceholder}><Text style={styles.posterPlaceholderText}>No Image</Text></View>
-            )}
-            <View style={styles.posterActions}>
-              <TouchableOpacity style={styles.posterButton} onPress={pickPoster}>
-                <Text style={styles.posterButtonText}>{poster ? '이미지 변경' : '파일 선택'}</Text>
-              </TouchableOpacity>
-              {poster ? (
-                <TouchableOpacity style={styles.removePosterButton} onPress={() => setPoster(null)}>
-                  <Text style={styles.removePosterText}>삭제</Text>
-                </TouchableOpacity>
-              ) : null}
-            </View>
+          {poster ? (
+            <TouchableOpacity onPress={() => setPosterPreviewOpen(true)} activeOpacity={0.88}>
+              <Image source={{ uri: poster.uri }} style={styles.posterPreview} />
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity style={styles.posterPlaceholder} activeOpacity={0.86} onPress={pickPoster}>
+              <Text style={styles.posterPlaceholderText}>포스터 없음</Text>
+            </TouchableOpacity>
+          )}
+          <View style={styles.posterActionRow}>
+            <TouchableOpacity style={styles.posterButton} onPress={pickPoster}>
+              <Text style={styles.posterButtonText}>{poster ? '이미지 변경' : '이미지 선택'}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.posterButton, styles.posterDeleteButton, !poster && styles.disabledPosterButton]} disabled={!poster} onPress={() => setPoster(null)}>
+              <Text style={[styles.posterDeleteText, !poster && styles.disabledPosterText]}>삭제</Text>
+            </TouchableOpacity>
           </View>
           <Text style={styles.helpText}>선택 사항입니다. 이미지를 누르면 크게 볼 수 있습니다.</Text>
         </View>
@@ -428,15 +426,18 @@ export default function EventCreatePage({ navigation }: any) {
             const canDelete = rounds.length > 1;
             return (
               <View key={round.id} style={styles.roundBox}>
-                <View style={styles.roundHeader}>
-                  <TouchableOpacity style={styles.roundHeaderCopy} onPress={() => toggleRound(round.id)} activeOpacity={0.8}>
+                <TouchableOpacity style={styles.roundHeader} onPress={() => toggleRound(round.id)} activeOpacity={0.82}>
+                  <View style={styles.roundHeaderCopy}>
                     <Text style={styles.roundTitle}>{expanded ? '▼' : '▶'} {index + 1}회차 · {formatDotDate(round.eventDate)}</Text>
                     <Text style={styles.roundSummary}>{round.startTime} ~ {round.endTime}</Text>
+                  </View>
+                </TouchableOpacity>
+
+                {roundManageMode ? (
+                  <TouchableOpacity style={[styles.inlineDeleteButton, !canDelete && styles.disabledDeleteButton]} disabled={!canDelete} onPress={() => removeRound(round.id)}>
+                    <Text style={[styles.inlineDeleteText, !canDelete && styles.disabledDeleteText]}>- 회차 삭제</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={[styles.deleteButton, !canDelete && styles.disabledDeleteButton]} disabled={!canDelete} onPress={() => removeRound(round.id)}>
-                    <Text style={[styles.deleteText, !canDelete && styles.disabledDeleteText]}>- 회차 삭제</Text>
-                  </TouchableOpacity>
-                </View>
+                ) : null}
 
                 {expanded ? (
                   <View style={styles.roundBody}>
@@ -461,16 +462,22 @@ export default function EventCreatePage({ navigation }: any) {
             );
           })}
 
-          <TouchableOpacity style={styles.addRoundButton} onPress={addRound}>
-            <Text style={styles.addRoundButtonText}>+ 회차 추가</Text>
-          </TouchableOpacity>
+          <View style={styles.roundActionRow}>
+            <TouchableOpacity style={[styles.roundActionButton, styles.addRoundButton]} onPress={addRound}>
+              <Text style={styles.addRoundButtonText}>+ 회차 추가</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.roundActionButton, roundManageMode && styles.activeManageButton]} onPress={() => setRoundManageMode((value) => !value)}>
+              <Text style={[styles.manageButtonText, roundManageMode && styles.activeManageButtonText]}>회차 관리</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         <View style={[styles.card, invalidFields.globalSale && styles.invalidRound]}>
           <TouchableOpacity style={styles.saleHeader} onPress={() => setSalePeriodExpanded((value) => !value)}>
-            <View>
+            <View style={styles.saleHeaderCopy}>
               <Text style={styles.cardTitle}>티켓 판매 기간</Text>
-              <Text style={styles.saleSummary}>판매 시작: {formatDotDate(globalSaleStart)} · 판매 종료: {formatDotDate(globalSaleEnd)}{roundSaleOverrideEnabled ? ' · 회차별 설정' : ''}</Text>
+              <Text style={styles.saleSummary}>판매 시작: {formatDotDate(globalSaleStart)}</Text>
+              <Text style={styles.saleSummary}>판매 종료: {formatDotDate(globalSaleEnd)}{roundSaleOverrideEnabled ? ' · 회차별 설정' : ''}</Text>
             </View>
             <Text style={styles.collapseText}>{salePeriodExpanded ? '접기' : '펼치기'}</Text>
           </TouchableOpacity>
@@ -479,7 +486,7 @@ export default function EventCreatePage({ navigation }: any) {
               <CompactRangePicker title="티켓 판매 기간" startDate={globalSaleStart} endDate={globalSaleEnd} onChange={setGlobalSalePeriod} />
               <TouchableOpacity style={styles.checkRow} onPress={() => setRoundSaleOverride(!roundSaleOverrideEnabled)}>
                 <Text style={[styles.checkbox, roundSaleOverrideEnabled && styles.checkedBox]}>{roundSaleOverrideEnabled ? '✓' : ''}</Text>
-                <Text style={styles.checkLabel}>회차별 판매 기간을 따로 설정</Text>
+                <Text style={styles.checkLabel}>회차별 판매 기간 설정</Text>
               </TouchableOpacity>
               {roundSaleOverrideEnabled ? (
                 <View style={styles.roundSaleList}>
@@ -487,6 +494,7 @@ export default function EventCreatePage({ navigation }: any) {
                     <CompactRangePicker
                       key={round.id}
                       title={`${index + 1}회차 판매 기간`}
+                      compactTitle={`${index + 1}회차`}
                       startDate={round.saleStartDate}
                       endDate={round.saleEndDate}
                       onChange={(start, end) => updateRound(round.id, { saleStartDate: start, saleEndDate: end, useGlobalSalePeriod: false })}
@@ -595,11 +603,13 @@ function SingleDatePicker({ value, onChange }: { value: string; onChange: (date:
 
 function CompactRangePicker({
   title,
+  compactTitle,
   startDate,
   endDate,
   onChange,
 }: {
   title: string;
+  compactTitle?: string;
   startDate: string;
   endDate: string;
   onChange: (start: string, end: string) => void;
@@ -620,27 +630,39 @@ function CompactRangePicker({
 
   return (
     <View style={styles.rangePickerBox}>
-      <TouchableOpacity style={styles.compactPickerButton} onPress={() => setOpen((current) => !current)}>
+      <TouchableOpacity style={styles.compactPickerButton} onPress={() => setOpen(true)}>
         <View style={styles.compactPickerCopy}>
-          <Text style={styles.rangePickerTitle}>{title}</Text>
-          <Text style={styles.rangePickerValue}><Text style={styles.saleStartText}>판매 시작:</Text> {formatDotDate(startDate)}</Text>
-          <Text style={styles.rangePickerValue}><Text style={styles.saleEndText}>판매 종료:</Text> {formatDotDate(endDate)}</Text>
+          <Text style={styles.rangePickerTitle}>{compactTitle || title}</Text>
+          <Text style={styles.rangePickerValue}>
+            <Text style={styles.saleStartText}>판매 시작:</Text> {formatDotDate(startDate)}
+          </Text>
+          <Text style={styles.rangePickerValue}>
+            <Text style={styles.saleEndText}>판매 종료:</Text> {formatDotDate(endDate)}
+          </Text>
         </View>
-        <Text style={styles.compactPickerAction}>{open ? '닫기' : '선택'}</Text>
+        <Text style={styles.compactPickerAction}>선택</Text>
       </TouchableOpacity>
-      {open ? (
-        <>
-          <View style={styles.rangeModeRow}>
-            <TouchableOpacity style={[styles.rangeModeButton, selectingStart && styles.activeRangeMode]} onPress={() => setSelectingStart(true)}>
-              <Text style={[styles.rangeModeText, selectingStart && styles.activeRangeModeText]}>판매 시작</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.rangeModeButton, !selectingStart && styles.activeRangeMode]} onPress={() => setSelectingStart(false)}>
-              <Text style={[styles.rangeModeText, !selectingStart && styles.activeRangeModeText]}>판매 종료</Text>
+      <Modal visible={open} transparent animationType="slide" onRequestClose={() => setOpen(false)}>
+        <View style={styles.sheetOverlay}>
+          <TouchableOpacity style={styles.sheetBackdrop} activeOpacity={1} onPress={() => setOpen(false)} />
+          <View style={styles.sheet}>
+            <View style={styles.sheetHandle} />
+            <Text style={styles.sheetTitle}>{title}</Text>
+            <View style={styles.rangeModeRow}>
+              <TouchableOpacity style={[styles.rangeModeButton, selectingStart && styles.activeRangeMode]} onPress={() => setSelectingStart(true)}>
+                <Text style={[styles.rangeModeText, selectingStart && styles.activeRangeModeText]}>판매 시작</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.rangeModeButton, !selectingStart && styles.activeRangeMode]} onPress={() => setSelectingStart(false)}>
+                <Text style={[styles.rangeModeText, !selectingStart && styles.activeRangeModeText]}>판매 종료</Text>
+              </TouchableOpacity>
+            </View>
+            <MonthCalendar selectedStart={startDate} selectedEnd={endDate} onSelect={select} />
+            <TouchableOpacity style={styles.sheetDoneButton} onPress={() => setOpen(false)}>
+              <Text style={styles.sheetDoneText}>완료</Text>
             </TouchableOpacity>
           </View>
-          <MonthCalendar selectedStart={startDate} selectedEnd={endDate} onSelect={select} />
-        </>
-      ) : null}
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -692,12 +714,22 @@ function TimeDropdown({ value, onChange }: { value: string; onChange: (time: str
 
 const styles = StyleSheet.create({
   keyboard: { flex: 1 },
-  container: { flex: 1, backgroundColor: '#F4F7FB' },
+  container: { flex: 1, backgroundColor: '#F8FAFC' },
   content: { padding: 14, paddingBottom: 84 },
   eyebrow: { color: '#2563EB', fontWeight: '800', fontSize: 12 },
   title: { marginTop: 3, fontSize: 26, fontWeight: '900', color: '#0F172A' },
   subtitle: { marginTop: 6, color: '#64748B', fontSize: 13, lineHeight: 19 },
-  card: { marginTop: 11, backgroundColor: '#FFFFFF', borderRadius: 8, padding: 12, borderWidth: 1, borderColor: '#E2E8F0' },
+  card: {
+    marginTop: 11,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    padding: 12,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 1,
+  },
   cardTitle: { color: '#0F172A', fontSize: 16, fontWeight: '900' },
   label: { marginTop: 9, marginBottom: 5, color: '#334155', fontSize: 13, fontWeight: '800' },
   helpText: { marginTop: 5, color: '#64748B', fontSize: 12, lineHeight: 17 },
@@ -708,25 +740,26 @@ const styles = StyleSheet.create({
   activeCategoryChipText: { color: '#2563EB' },
   input: { borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, padding: 10, backgroundColor: '#FFFFFF', color: '#0F172A' },
   invalidInput: { borderColor: '#DC2626', backgroundColor: '#FEF2F2' },
-  textArea: { minHeight: 96, maxHeight: 200, textAlignVertical: 'top' },
-  posterRow: { flexDirection: 'row', gap: 10, alignItems: 'center' },
-  posterPreview: { width: 68, height: 90, borderRadius: 8, backgroundColor: '#E2E8F0' },
-  posterPlaceholder: { width: 68, height: 90, borderRadius: 8, borderWidth: 1, borderColor: '#CBD5E1', backgroundColor: '#F8FAFC', alignItems: 'center', justifyContent: 'center' },
-  posterPlaceholderText: { color: '#94A3B8', fontSize: 11, fontWeight: '900' },
-  posterActions: { flex: 1, gap: 7 },
-  posterButton: { borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, padding: 11, backgroundColor: '#FFFFFF', alignItems: 'center' },
+  textArea: { minHeight: 76, maxHeight: 180, textAlignVertical: 'top' },
+  posterPreview: { width: '100%', aspectRatio: 3 / 4, borderRadius: 8, backgroundColor: '#E2E8F0' },
+  posterPlaceholder: { width: '100%', aspectRatio: 3 / 4, borderRadius: 8, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' },
+  posterPlaceholderText: { color: '#94A3B8', fontSize: 13, fontWeight: '900' },
+  posterActionRow: { flexDirection: 'row', gap: 8, marginTop: 9 },
+  posterButton: { flex: 1, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, padding: 11, backgroundColor: '#FFFFFF', alignItems: 'center' },
   posterButtonText: { color: '#0F172A', fontWeight: '900' },
-  removePosterButton: { borderWidth: 1, borderColor: '#FCA5A5', borderRadius: 8, padding: 9, backgroundColor: '#FEF2F2', alignItems: 'center' },
-  removePosterText: { color: '#DC2626', fontWeight: '900' },
-  roundBox: { marginTop: 9, borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 8, backgroundColor: '#FFFFFF' },
-  invalidRound: { borderColor: '#FCA5A5', backgroundColor: '#FFF7F7' },
-  roundHeader: { padding: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 },
+  posterDeleteButton: { borderColor: '#FCA5A5', backgroundColor: '#FFF7F7' },
+  posterDeleteText: { color: '#B91C1C', fontWeight: '900' },
+  disabledPosterButton: { borderColor: '#E2E8F0', backgroundColor: '#F8FAFC' },
+  disabledPosterText: { color: '#94A3B8' },
+  roundBox: { marginTop: 9, borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, backgroundColor: '#FFFFFF' },
+  invalidRound: { borderWidth: 1, borderColor: '#FCA5A5', backgroundColor: '#FFF7F7' },
+  roundHeader: { padding: 12 },
   roundHeaderCopy: { flex: 1 },
   roundTitle: { color: '#0F172A', fontSize: 15, fontWeight: '900' },
-  roundSummary: { marginTop: 3, color: '#64748B', fontSize: 13, fontWeight: '800' },
-  deleteButton: { borderWidth: 1, borderColor: '#FCA5A5', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 5, backgroundColor: '#FEF2F2' },
+  roundSummary: { marginTop: 4, color: '#64748B', fontSize: 13, fontWeight: '800' },
+  inlineDeleteButton: { marginHorizontal: 10, marginBottom: 9, borderWidth: 1, borderColor: '#FECACA', borderRadius: 8, paddingVertical: 9, alignItems: 'center', backgroundColor: '#FFF7F7' },
+  inlineDeleteText: { color: '#B91C1C', fontWeight: '800', fontSize: 13 },
   disabledDeleteButton: { borderColor: '#E2E8F0', backgroundColor: '#F8FAFC' },
-  deleteText: { color: '#DC2626', fontWeight: '900', fontSize: 12 },
   disabledDeleteText: { color: '#94A3B8' },
   roundBody: { borderTopWidth: 1, borderTopColor: '#F1F5F9', paddingHorizontal: 10, paddingVertical: 8 },
   flatField: { marginTop: 7 },
@@ -736,7 +769,7 @@ const styles = StyleSheet.create({
   compactPickerCopy: { flex: 1 },
   compactPickerText: { color: '#0F172A', fontWeight: '900' },
   compactPickerAction: { color: '#2563EB', fontWeight: '900', fontSize: 12 },
-  calendar: { marginTop: 8, borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 8, padding: 8, backgroundColor: '#F8FAFC' },
+  calendar: { marginTop: 8, borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 8, padding: 8, backgroundColor: '#FFFFFF' },
   calendarHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 7 },
   calendarTitle: { color: '#0F172A', fontWeight: '900' },
   monthButton: { borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, paddingHorizontal: 9, paddingVertical: 6, backgroundColor: '#FFFFFF' },
@@ -757,29 +790,42 @@ const styles = StyleSheet.create({
   activeTimeOption: { backgroundColor: '#EFF6FF' },
   timeOptionText: { color: '#475569', fontWeight: '900' },
   activeTimeOptionText: { color: '#2563EB' },
-  applyRoundButton: { marginTop: 10, borderRadius: 8, paddingVertical: 11, backgroundColor: '#0F172A', alignItems: 'center' },
-  applyRoundText: { color: '#FFFFFF', fontWeight: '900' },
+  applyRoundButton: { marginTop: 10, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, paddingVertical: 11, backgroundColor: '#F8FAFC', alignItems: 'center' },
+  applyRoundText: { color: '#0F172A', fontWeight: '900' },
+  roundActionRow: { flexDirection: 'row', gap: 8, marginTop: 11 },
+  roundActionButton: { flex: 1, borderWidth: 1, borderRadius: 8, paddingVertical: 12, alignItems: 'center' },
+  addRoundButton: { borderColor: '#2563EB', backgroundColor: '#EFF6FF' },
+  addRoundButtonText: { color: '#2563EB', fontSize: 15, fontWeight: '900' },
+  activeManageButton: { borderColor: '#94A3B8', backgroundColor: '#F1F5F9' },
+  manageButtonText: { color: '#334155', fontSize: 15, fontWeight: '900' },
+  activeManageButtonText: { color: '#0F172A' },
   checkRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 },
   checkbox: { width: 22, height: 22, borderRadius: 4, borderWidth: 1, borderColor: '#CBD5E1', textAlign: 'center', color: '#FFFFFF', fontWeight: '900', lineHeight: 20 },
   checkedBox: { backgroundColor: '#2563EB', borderColor: '#2563EB' },
   checkLabel: { color: '#0F172A', fontWeight: '800' },
-  addRoundButton: { borderWidth: 1, borderColor: '#2563EB', borderRadius: 8, paddingVertical: 12, alignItems: 'center', marginTop: 11, backgroundColor: '#EFF6FF' },
-  addRoundButtonText: { color: '#2563EB', fontSize: 15, fontWeight: '900' },
   saleHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12 },
-  saleSummary: { marginTop: 5, color: '#64748B', fontSize: 12, fontWeight: '800', lineHeight: 17 },
+  saleHeaderCopy: { flex: 1 },
+  saleSummary: { marginTop: 4, color: '#64748B', fontSize: 12, fontWeight: '800', lineHeight: 17 },
   collapseText: { color: '#2563EB', fontWeight: '900', fontSize: 12 },
   saleBody: { marginTop: 2 },
   rangePickerBox: { marginTop: 9 },
   rangePickerTitle: { color: '#64748B', fontSize: 12, fontWeight: '900' },
   rangePickerValue: { marginTop: 3, color: '#0F172A', fontWeight: '900' },
-  saleStartText: { color: '#2563EB', fontWeight: '900' },
-  saleEndText: { color: '#DC2626', fontWeight: '900' },
+  saleStartText: { color: '#3B82C4', fontWeight: '900' },
+  saleEndText: { color: '#C2414B', fontWeight: '900' },
   rangeModeRow: { flexDirection: 'row', gap: 8, marginTop: 8 },
   rangeModeButton: { flex: 1, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, paddingVertical: 9, alignItems: 'center', backgroundColor: '#FFFFFF' },
   activeRangeMode: { borderColor: '#2563EB', backgroundColor: '#EFF6FF' },
   rangeModeText: { color: '#475569', fontWeight: '900', fontSize: 12 },
   activeRangeModeText: { color: '#2563EB' },
   roundSaleList: { marginTop: 2 },
+  sheetOverlay: { flex: 1, justifyContent: 'flex-end' },
+  sheetBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(15, 23, 42, 0.36)' },
+  sheet: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 16, borderTopRightRadius: 16, padding: 14, paddingBottom: 22 },
+  sheetHandle: { width: 42, height: 4, borderRadius: 999, backgroundColor: '#CBD5E1', alignSelf: 'center', marginBottom: 10 },
+  sheetTitle: { color: '#0F172A', fontSize: 16, fontWeight: '900' },
+  sheetDoneButton: { marginTop: 10, borderRadius: 8, paddingVertical: 12, alignItems: 'center', backgroundColor: '#0F172A' },
+  sheetDoneText: { color: '#FFFFFF', fontWeight: '900' },
   errorPanel: { marginTop: 13, borderWidth: 1, borderColor: '#FCA5A5', backgroundColor: '#FEF2F2', borderRadius: 8, padding: 12 },
   errorTitle: { color: '#B91C1C', fontWeight: '900', marginBottom: 6 },
   errorItem: { color: '#B91C1C', fontWeight: '800', lineHeight: 20 },
@@ -787,6 +833,6 @@ const styles = StyleSheet.create({
   primaryButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '900' },
   disabledButton: { opacity: 0.55 },
   previewOverlay: { flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.92)', alignItems: 'center', justifyContent: 'center', padding: 20 },
-  previewImage: { width: '100%', height: '78%' },
+  previewImage: { width: '88%', aspectRatio: 3 / 4, borderRadius: 8 },
   previewClose: { marginTop: 18, color: '#FFFFFF', fontSize: 15, fontWeight: '900' },
 });
