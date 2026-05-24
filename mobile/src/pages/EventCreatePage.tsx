@@ -183,7 +183,7 @@ export default function EventCreatePage({ navigation }: any) {
   const defaultEventDate = useMemo(() => addDays(today, 14), [today]);
   const defaultSaleStart = today;
   const defaultSaleEnd = useMemo(() => defaultEventDate, [defaultEventDate]);
-  const initialRound = useMemo(() => buildRound(0, defaultEventDate, defaultSaleStart, defaultSaleEnd), [defaultEventDate, defaultSaleEnd, defaultSaleStart]);
+  const initialRound = useMemo(() => buildRound(0, defaultEventDate, defaultSaleStart, defaultSaleEnd, false), [defaultEventDate, defaultSaleEnd, defaultSaleStart]);
 
   const [category, setCategory] = useState('CONCERT');
   const [name, setName] = useState('');
@@ -199,7 +199,7 @@ export default function EventCreatePage({ navigation }: any) {
   const [globalSaleStartTime, setGlobalSaleStartTime] = useState(nowTime);
   const [globalSaleEnd, setGlobalSaleEnd] = useState(defaultSaleEnd);
   const [globalSaleEndTime, setGlobalSaleEndTime] = useState('21:00');
-  const [roundSaleOverrideEnabled, setRoundSaleOverrideEnabled] = useState(false);
+  const [roundSaleOverrideEnabled, setRoundSaleOverrideEnabled] = useState(true);
   const [activeSaleRoundId, setActiveSaleRoundId] = useState<string | null>(null);
   const [roundAcknowledgedIds, setRoundAcknowledgedIds] = useState<Record<string, boolean>>({});
   const [errors, setErrors] = useState<string[]>([]);
@@ -258,24 +258,41 @@ export default function EventCreatePage({ navigation }: any) {
     setExpandedRoundIds((current) => current.filter((item) => item !== id));
   };
 
-  const setGlobalSalePeriod = (start: string, end: string) => {
-    setGlobalSaleStart(start);
-    setGlobalSaleEnd(end);
-    setRounds((current) => current.map((round) => (
-      roundSaleOverrideEnabled
-        ? round
-        : { ...round, saleStartDate: start, saleStartTime: globalSaleStartTime, saleEndDate: end, saleEndTime: globalSaleEndTime, useGlobalSalePeriod: true }
-    )));
+  const syncGlobalSaleToRounds = (
+    nextStartDate = globalSaleStart,
+    nextStartTime = globalSaleStartTime,
+    nextEndDate = globalSaleEnd,
+    nextEndTime = globalSaleEndTime,
+  ) => {
+    if (roundSaleOverrideEnabled) return;
+    setRounds((current) => current.map((round) => ({
+      ...round,
+      saleStartDate: nextStartDate,
+      saleStartTime: nextStartTime,
+      saleEndDate: nextEndDate,
+      saleEndTime: nextEndTime,
+      useGlobalSalePeriod: true,
+    })));
   };
 
-  const setGlobalSaleTime = (startTime: string, endTime: string) => {
-    setGlobalSaleStartTime(startTime);
-    setGlobalSaleEndTime(endTime);
-    setRounds((current) => current.map((round) => (
-      roundSaleOverrideEnabled
-        ? round
-        : { ...round, saleStartTime: startTime, saleEndTime: endTime, useGlobalSalePeriod: true }
-    )));
+  const updateGlobalSaleStartDate = (date: string) => {
+    setGlobalSaleStart(date);
+    syncGlobalSaleToRounds(date, globalSaleStartTime, globalSaleEnd, globalSaleEndTime);
+  };
+
+  const updateGlobalSaleStartTime = (time: string) => {
+    setGlobalSaleStartTime(time);
+    syncGlobalSaleToRounds(globalSaleStart, time, globalSaleEnd, globalSaleEndTime);
+  };
+
+  const updateGlobalSaleEndDate = (date: string) => {
+    setGlobalSaleEnd(date);
+    syncGlobalSaleToRounds(globalSaleStart, globalSaleStartTime, date, globalSaleEndTime);
+  };
+
+  const updateGlobalSaleEndTime = (time: string) => {
+    setGlobalSaleEndTime(time);
+    syncGlobalSaleToRounds(globalSaleStart, globalSaleStartTime, globalSaleEnd, time);
   };
 
   const setRoundSaleOverride = (enabled: boolean) => {
@@ -674,31 +691,42 @@ export default function EventCreatePage({ navigation }: any) {
 
             {!roundSaleOverrideEnabled ? (
               <View style={styles.salePeriodBlock}>
-                <CompactRangePicker
-                  title="티켓 판매 기간"
-                  compactTitle="판매 기간"
-                  startDate={globalSaleStart}
-                  endDate={globalSaleEnd}
-                  onChange={setGlobalSalePeriod}
-                  ctaLabel="기간 변경"
-                  markedRounds={rounds.map((round, index) => ({ date: round.eventDate, label: `${index + 1}회차` }))}
-                  summaryRounds={rounds}
-                  onOpen={() => setActiveSaleRoundId(null)}
-                  active={!roundSaleOverrideEnabled}
-                />
-                <View style={styles.saleTimeGrid}>
-                  <View style={styles.flatField}>
-                    <Text style={styles.flatLabel}>판매 시작 시간</Text>
-                    <TimeWheelPickerBase label="판매 시작 시간" value={globalSaleStartTime} onChange={(value) => setGlobalSaleTime(value, globalSaleEndTime)} onOpen={() => setActiveSaleRoundId(null)} onClose={() => setActiveSaleRoundId(null)} />
+                <View style={styles.saleBoundaryGroup}>
+                  <View style={styles.saleBoundaryCard}>
+                    <Text style={styles.saleBoundaryTitle}>판매 시작</Text>
+                    <View style={styles.saleBoundaryRow}>
+                      <View style={styles.saleBoundaryField}>
+                        <Text style={styles.flatLabel}>날짜</Text>
+                        <SingleDatePicker
+                          value={globalSaleStart}
+                          onChange={updateGlobalSaleStartDate}
+                          markedRounds={rounds.map((round, index) => ({ date: round.eventDate, label: `${index + 1}회차` }))}
+                        />
+                      </View>
+                      <View style={styles.saleBoundaryField}>
+                        <Text style={styles.flatLabel}>시간</Text>
+                        <TimeWheelPickerBase label="판매 시작 시간" value={globalSaleStartTime} onChange={updateGlobalSaleStartTime} onOpen={() => setActiveSaleRoundId(null)} onClose={() => setActiveSaleRoundId(null)} />
+                      </View>
+                    </View>
                   </View>
-                  <View style={styles.flatField}>
-                    <Text style={styles.flatLabel}>판매 종료 시간</Text>
-                    <TimeWheelPickerBase label="판매 종료 시간" value={globalSaleEndTime} onChange={(value) => setGlobalSaleTime(globalSaleStartTime, value)} onOpen={() => setActiveSaleRoundId(null)} onClose={() => setActiveSaleRoundId(null)} />
+                  <View style={styles.saleBoundaryCard}>
+                    <Text style={styles.saleBoundaryTitle}>판매 종료</Text>
+                    <View style={styles.saleBoundaryRow}>
+                      <View style={styles.saleBoundaryField}>
+                        <Text style={styles.flatLabel}>날짜</Text>
+                        <SingleDatePicker
+                          value={globalSaleEnd}
+                          onChange={updateGlobalSaleEndDate}
+                          markedRounds={rounds.map((round, index) => ({ date: round.eventDate, label: `${index + 1}회차` }))}
+                        />
+                      </View>
+                      <View style={styles.saleBoundaryField}>
+                        <Text style={styles.flatLabel}>시간</Text>
+                        <TimeWheelPickerBase label="판매 종료 시간" value={globalSaleEndTime} onChange={updateGlobalSaleEndTime} onOpen={() => setActiveSaleRoundId(null)} onClose={() => setActiveSaleRoundId(null)} />
+                      </View>
+                    </View>
                   </View>
                 </View>
-                <TouchableOpacity style={styles.applyRoundButton} onPress={() => setActiveSaleRoundId(null)}>
-                  <Text style={styles.applyRoundText}>완료</Text>
-                </TouchableOpacity>
               </View>
             ) : (
               <View style={styles.roundSaleList}>
@@ -1196,6 +1224,11 @@ const styles = StyleSheet.create({
   saleHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12 },
   saleHeaderCopy: { flex: 1 },
   salePeriodBlock: { marginTop: 4 },
+  saleBoundaryGroup: { marginTop: 8, gap: 10 },
+  saleBoundaryCard: { borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 8, padding: 10, backgroundColor: '#FFFFFF' },
+  saleBoundaryTitle: { color: '#2563EB', fontSize: 13, fontWeight: '900', marginBottom: 8 },
+  saleBoundaryRow: { flexDirection: 'row', gap: 8 },
+  saleBoundaryField: { flex: 1 },
   saleTimeGrid: { gap: 8, marginTop: 8 },
   roundSaleItem: { marginTop: 8 },
   saleRoundStrip: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 10 },
