@@ -269,7 +269,7 @@ export default function OrganizerDashboardPage({ navigation }: any) {
               <Text style={styles.emptyText}>아직 등록한 이벤트가 없습니다.</Text>
             ) : (
               events.map((event) => (
-                <View key={event.id} style={styles.eventRow}>
+                <TouchableOpacity key={event.id} style={styles.eventRow} activeOpacity={0.85} onPress={() => navigation.navigate('OrganizerEventDetail', { eventId: event.id })}>
                   <View style={styles.eventInfo}>
                     <Text style={styles.eventCategory}>{categoryLabel(event.category)}</Text>
                     <Text style={styles.eventTitle}>{eventTitle(event)}</Text>
@@ -278,7 +278,7 @@ export default function OrganizerDashboardPage({ navigation }: any) {
                     <Text style={styles.eventMeta}>판매 기간 {formatEventRange(event.salesStartAt || event.primarySaleStart, event.salesEndAt || event.primarySaleEnd)}</Text>
                   </View>
                   <Text style={styles.badge}>{formatSalesStatus(event.salesStartAt || event.primarySaleStart, event.salesEndAt || event.primarySaleEnd)}</Text>
-                </View>
+                </TouchableOpacity>
               ))
             )}
           </View>
