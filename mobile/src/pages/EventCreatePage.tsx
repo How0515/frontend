@@ -449,7 +449,7 @@ export default function EventCreatePage({ navigation }: any) {
       nextInvalid.venue = true;
     }
     if (!description.trim()) {
-      nextErrors.push('이벤트 소개를 입력해주세요.');
+      nextErrors.push('소개를 입력해주세요.');
       nextInvalid.description = true;
     }
     if (rounds.length === 0) {
@@ -666,7 +666,7 @@ export default function EventCreatePage({ navigation }: any) {
           <Text style={styles.label}>장소</Text>
           <TextInput style={[styles.input, invalidFields.venue && styles.invalidInput]} value={venue} onChangeText={setVenue} placeholder="예: 올림픽공원 KSPO DOME" />
 
-          <Text style={styles.label}>이벤트 소개</Text>
+          <Text style={styles.label}>소개</Text>
           <TextInput
             style={[styles.input, styles.textArea, { height: descriptionHeight }, invalidFields.description && styles.invalidInput]}
             value={description}
