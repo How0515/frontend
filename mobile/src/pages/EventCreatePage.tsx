@@ -102,6 +102,24 @@ function toDateTimeIso(date: string, time: string) {
   return new Date(`${date}T${time}:00`).toISOString();
 }
 
+function confirmOvernightRound(message: string) {
+  if (Platform.OS === 'web' && typeof window !== 'undefined') {
+    return Promise.resolve(window.confirm(message));
+  }
+
+  return new Promise<boolean>((resolve) => {
+    Alert.alert(
+      '회차 저장',
+      message,
+      [
+        { text: '취소', style: 'cancel', onPress: () => resolve(false) },
+        { text: '확인', onPress: () => resolve(true) },
+      ],
+      { cancelable: true },
+    );
+  });
+}
+
 function compareDateTime(dateA: string, timeA: string, dateB: string, timeB: string) {
   return new Date(`${dateA}T${timeA}:00`).getTime() - new Date(`${dateB}T${timeB}:00`).getTime();
 }
@@ -209,25 +227,17 @@ export default function EventCreatePage({ navigation }: any) {
     setExpandedRoundIds((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
   };
 
-  const saveRound = (id: string) => {
+  const saveRound = async (id: string) => {
     const target = rounds.find((round) => round.id === id);
     if (target) {
       const startsAt = toDateTimeIso(target.eventDate, target.startTime);
       const endsAt = toDateTimeIso(target.eventDate, target.endTime);
       if (endsAt <= startsAt) {
-        Alert.alert(
-          '다음 날 종료',
-          '종료 시간이 시작 시간보다 빠릅니다. 다음 날 종료되는 일정으로 처리됩니다.',
-          [
-            { text: '취소', style: 'cancel' },
-            { text: '확인', onPress: () => {
-              setRoundMessages((current) => ({ ...current, [id]: ['종료 시간이 시작 시간보다 빠릅니다. 다음 날 종료되는 일정으로 처리됩니다.'] }));
-              setErrors([]);
-              setInvalidFields((current) => ({ ...current, rounds: false }));
-              setExpandedRoundIds((current) => current.filter((item) => item !== id));
-            } },
-          ],
-        );
+        const confirmed = await confirmOvernightRound('종료 시간이 시작 시간보다 빠릅니다. 다음 날 종료되는 일정으로 처리됩니다.');
+        if (!confirmed) return;
+        setRoundMessages((current) => ({ ...current, [id]: ['종료 시간이 시작 시간보다 빠릅니다. 다음 날 종료되는 일정으로 처리됩니다.'] }));
+        setErrors([]);
+        setInvalidFields((current) => ({ ...current, rounds: false }));
         return;
       }
     }
@@ -525,6 +535,12 @@ export default function EventCreatePage({ navigation }: any) {
               </TouchableOpacity>
             ))}
           </View>
+
+          <Text style={styles.label}>이벤트 이름</Text>
+          <TextInput style={[styles.input, invalidFields.name && styles.invalidInput]} value={name} onChangeText={setName} placeholder="예: TRUST LIVE 2026" />
+          <Text style={styles.helpText}>사용자에게 표시될 이벤트 이름을 입력해주세요.</Text>
+
+          <Text style={styles.label}>장소</Text>
           <TextInput style={[styles.input, invalidFields.venue && styles.invalidInput]} value={venue} onChangeText={setVenue} placeholder="예: 올림픽공원 KSPO DOME" />
 
           <Text style={styles.label}>이벤트 소개</Text>
@@ -604,7 +620,7 @@ export default function EventCreatePage({ navigation }: any) {
                         {roundMessages[round.id].map((message) => <Text key={message} style={styles.inlineWarningText}>· {message}</Text>)}
                       </View>
                     ) : null}
-                    <TouchableOpacity style={styles.applyRoundButton} onPress={() => saveRound(round.id)}>
+                    <TouchableOpacity style={styles.applyRoundButton} onPress={() => void saveRound(round.id)}>
                       <Text style={styles.applyRoundText}>회차 저장</Text>
                     </TouchableOpacity>
                   </View>
@@ -625,13 +641,6 @@ export default function EventCreatePage({ navigation }: any) {
             </View>
           </View>
           <View style={styles.saleBody}>
-            <SaleRoundStrip
-              rounds={rounds}
-              activeRoundId={roundSaleOverrideEnabled ? activeSaleRoundId : null}
-              globalSaleStart={globalSaleStart}
-              globalSaleEnd={globalSaleEnd}
-              perRound={roundSaleOverrideEnabled}
-            />
             <Text style={styles.helpText}>티켓을 판매할 기간을 설정하세요.</Text>
             {saleMessages.length > 0 ? (
               <View style={styles.inlineWarningBox}>
@@ -657,8 +666,9 @@ export default function EventCreatePage({ navigation }: any) {
                   startDate={globalSaleStart}
                   endDate={globalSaleEnd}
                   onChange={setGlobalSalePeriod}
-                  ctaLabel="판매 기간 변경"
+                  ctaLabel="기간 변경"
                   markedRounds={rounds.map((round, index) => ({ date: round.eventDate, label: `${index + 1}회차` }))}
+                  summaryRounds={rounds}
                   onOpen={() => setActiveSaleRoundId(null)}
                 />
                 <View style={styles.saleTimeGrid}>
@@ -683,6 +693,8 @@ export default function EventCreatePage({ navigation }: any) {
                       onChange={(start, end) => updateRound(round.id, { saleStartDate: start, saleEndDate: end, useGlobalSalePeriod: false })}
                       markedRounds={rounds.map((item, itemIndex) => ({ date: item.eventDate, label: `${itemIndex + 1}회차` }))}
                       active={activeSaleRoundId === round.id}
+                      summaryRounds={rounds}
+                      summaryActiveRoundId={round.id}
                       onOpen={() => setActiveSaleRoundId(round.id)}
                       onClose={() => setActiveSaleRoundId((current) => current === round.id ? null : current)}
                     />
@@ -797,21 +809,40 @@ function SingleDatePicker({
   onChange: (date: string) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [draftDate, setDraftDate] = useState(value);
+
+  const complete = () => {
+    onChange(draftDate);
+    setOpen(false);
+  };
+
   return (
     <View style={styles.flatPicker}>
-      <TouchableOpacity style={styles.compactPickerButton} onPress={() => setOpen((current) => !current)}>
+      <TouchableOpacity style={styles.compactPickerButton} onPress={() => {
+        setDraftDate(value);
+        setOpen(true);
+      }}>
         <Text style={styles.compactPickerText}>{formatDotDate(value)}</Text>
         <Text style={styles.compactPickerAction}>{open ? '닫기' : '선택'}</Text>
       </TouchableOpacity>
       {open ? (
-        <MonthCalendar
-          selectedStart={value}
-          markedRounds={markedRounds}
-          onSelect={(date) => {
-            onChange(date);
-            setOpen(false);
-          }}
-        />
+        <Modal transparent animationType="slide" onRequestClose={() => setOpen(false)}>
+          <View style={styles.sheetOverlay}>
+            <TouchableOpacity style={styles.sheetBackdrop} activeOpacity={1} onPress={() => setOpen(false)} />
+            <View style={styles.sheet}>
+              <View style={styles.sheetHandle} />
+              <Text style={styles.sheetTitle}>이벤트 날짜</Text>
+              <MonthCalendar
+                selectedStart={draftDate}
+                markedRounds={markedRounds}
+                onSelect={(date) => setDraftDate(date)}
+              />
+              <TouchableOpacity style={styles.sheetDoneButton} onPress={complete}>
+                <Text style={styles.sheetDoneText}>완료</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
       ) : null}
     </View>
   );
@@ -820,12 +851,14 @@ function SingleDatePicker({
 function CompactRangePicker({
   title,
   compactTitle,
-  ctaLabel = '기간 선택',
+  ctaLabel = '기간 변경',
   markedRounds = [],
   startDate,
   endDate,
   onChange,
   active = false,
+  summaryRounds = [],
+  summaryActiveRoundId = null,
   onOpen,
   onClose,
 }: {
@@ -837,6 +870,8 @@ function CompactRangePicker({
   endDate: string;
   onChange: (start: string, end: string) => void;
   active?: boolean;
+  summaryRounds?: EventRoundDraft[];
+  summaryActiveRoundId?: string | null;
   onOpen?: () => void;
   onClose?: () => void;
 }) {
@@ -891,6 +926,22 @@ function CompactRangePicker({
           <View style={styles.sheet}>
             <View style={styles.sheetHandle} />
             <Text style={styles.sheetTitle}>{title}</Text>
+            <SaleRoundStrip
+              rounds={summaryRounds.length > 0 ? summaryRounds : markedRounds.map((item, index) => ({
+                id: `${item.date}-${index}`,
+                title: item.label,
+                eventDate: item.date,
+                startTime: '00:00',
+                endTime: '00:00',
+                useGlobalSalePeriod: true,
+                saleStartDate: startDate,
+                saleStartTime: '00:00',
+                saleEndDate: endDate,
+                saleEndTime: '00:00',
+              }))}
+              activeRoundId={summaryActiveRoundId}
+              perRound={!!summaryActiveRoundId}
+            />
             <Text style={styles.sheetStateText}>{selectingStart ? '판매 시작일을 선택하세요.' : '판매 종료일을 선택하세요.'}</Text>
             <MonthCalendar selectedStart={draftStart} selectedEnd={draftEnd} markedRounds={markedRounds} onSelect={select} />
             <TouchableOpacity style={[styles.sheetDoneButton, (!draftStart || !draftEnd) && styles.disabledButton]} disabled={!draftStart || !draftEnd} onPress={complete}>
@@ -906,14 +957,10 @@ function CompactRangePicker({
 function SaleRoundStrip({
   rounds,
   activeRoundId,
-  globalSaleStart,
-  globalSaleEnd,
   perRound,
 }: {
   rounds: EventRoundDraft[];
   activeRoundId: string | null;
-  globalSaleStart: string;
-  globalSaleEnd: string;
   perRound: boolean;
 }) {
   return (
@@ -934,9 +981,6 @@ function SaleRoundStrip({
           </View>
         ))
       )}
-      <View style={[styles.saleRoundChip, styles.saleRoundChipMuted]}>
-        <Text style={styles.saleRoundChipText}>{`[전체 · ${formatShortDate(globalSaleStart)} ~ ${formatShortDate(globalSaleEnd)}]`}</Text>
-      </View>
     </View>
   );
 }
