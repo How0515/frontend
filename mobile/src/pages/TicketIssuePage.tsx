@@ -460,7 +460,12 @@ export default function TicketIssuePage({ navigation, route }: any) {
     `${sectionNameOf(policy)} · ${policy.quantity}장 · ${policy.priceEth}ETH · 판매 ${formatDateShort(policy.saleStartDate)}~${formatDateShort(policy.saleEndDate)} · ${policy.resaleEnabled ? `리셀 ${resaleRateOf(policy)}%` : '리셀 불가'}`
   );
 
-  const pageTitle = flowPage === 1 ? '정책 적용 방식 선택' : flowPage === 2 ? '회차별 총 티켓 수 설정' : '좌석 정책 설정';
+  const pageTitle = flowPage === 1 ? '적용 방식 선택' : flowPage === 2 ? '총 티켓 수량 설정' : '좌석 판매 설정';
+  const pageDescription = flowPage === 1
+    ? '좌석 수, 가격, 판매 기간, 리셀 정책을 모든 회차에 동일하게 적용할지 선택하세요.'
+    : flowPage === 2
+      ? '각 회차의 총 티켓 수를 설정하세요.'
+      : '좌석 구역을 선택한 뒤 판매할 티켓 상품을 저장하세요.';
   const canRevealQuantity = !!sectionNameOf(currentDraft);
   const canRevealPrice = canRevealQuantity && isPositiveInteger(currentDraft.quantity);
   const canRevealResale = canRevealPrice && isPositiveNumber(currentDraft.priceEth) && !!currentDraft.saleStartDate && !!currentDraft.saleEndDate;
@@ -498,16 +503,17 @@ export default function TicketIssuePage({ navigation, route }: any) {
 
         <View style={styles.card}>
           <Text style={styles.cardTitle}>{pageTitle}</Text>
+          <Text style={styles.pageDescription}>{pageDescription}</Text>
 
           {flowPage === 1 ? (
             <View style={styles.modeStack}>
               <TouchableOpacity style={[styles.modeCard, policyMode === 'global' && styles.activeModeCard]} onPress={() => setPolicyMode('global')}>
-                <Text style={[styles.modeTitle, policyMode === 'global' && styles.activeModeText]}>전체 설정 적용</Text>
-                <Text style={styles.modeHint}>같은 좌석 정책을 모든 회차에 적용합니다.</Text>
+                <Text style={[styles.modeTitle, policyMode === 'global' && styles.activeModeText]}>{policyMode === 'global' ? '✓ ' : ''}전체 설정 적용</Text>
+                <Text style={styles.modeHint}>모든 회차에 같은 규칙을 일괄 적용합니다.</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[styles.modeCard, policyMode === 'round' && styles.activeModeCard]} onPress={() => setPolicyMode('round')}>
-                <Text style={[styles.modeTitle, policyMode === 'round' && styles.activeModeText]}>회차별 설정</Text>
-                <Text style={styles.modeHint}>회차마다 다른 좌석 정책을 적용합니다.</Text>
+                <Text style={[styles.modeTitle, policyMode === 'round' && styles.activeModeText]}>{policyMode === 'round' ? '✓ ' : ''}회차별 설정</Text>
+                <Text style={styles.modeHint}>회차마다 다른 규칙을 적용합니다.</Text>
               </TouchableOpacity>
             </View>
           ) : null}
@@ -547,8 +553,10 @@ export default function TicketIssuePage({ navigation, route }: any) {
                 return (
                   <View key={key} style={styles.roundBox}>
                     <TouchableOpacity style={styles.roundHeader} onPress={() => updateRoundPolicy(key, { expanded: !expanded })}>
-                      <Text style={styles.roundTitle}>{expanded ? '▼' : '▶'} {roundLabel(round, index)}</Text>
-                      <Text style={styles.roundMeta}>총 {policy?.totalTicketCount || 0}장</Text>
+                      <View style={styles.roundHeaderCopy}>
+                        <Text style={styles.roundTitle}>{expanded ? '▼' : '▶'} {roundLabel(round, index)}</Text>
+                        <Text style={styles.roundMeta}>{policy?.totalTicketCount ? `총 ${policy.totalTicketCount}장 설정됨` : '총 티켓 수 미설정'}</Text>
+                      </View>
                     </TouchableOpacity>
                     {expanded ? (
                       <View style={styles.roundBody}>
@@ -731,9 +739,11 @@ export default function TicketIssuePage({ navigation, route }: any) {
           </View>
         ) : null}
 
-        <TouchableOpacity style={styles.secondaryButton} onPress={() => navigation.navigate('TicketExplore', { eventId })}>
-          <Text style={styles.secondaryButtonText}>전체 발행 티켓 보기</Text>
-        </TouchableOpacity>
+        {lastIssuedSummary ? (
+          <TouchableOpacity style={styles.secondaryButton} onPress={() => navigation.navigate('TicketExplore', { eventId })}>
+            <Text style={styles.secondaryButtonText}>전체 발행 티켓 보기</Text>
+          </TouchableOpacity>
+        ) : null}
 
         {flowPage === 3 ? (
           <View style={styles.compactCard}>
@@ -781,13 +791,28 @@ export default function TicketIssuePage({ navigation, route }: any) {
 }
 
 function StepProgress({ page }: { page: FlowPage }) {
+  const steps: Array<{ step: FlowPage; label: string }> = [
+    { step: 1, label: '적용 방식' },
+    { step: 2, label: '총 수량' },
+    { step: 3, label: '좌석 판매' },
+  ];
+
   return (
     <View style={styles.progressRow}>
-      {[1, 2, 3].map((item) => (
-        <View key={item} style={[styles.progressDot, page >= item && styles.progressDotActive]}>
-          <Text style={[styles.progressDotText, page >= item && styles.progressDotTextActive]}>{item}</Text>
-        </View>
-      ))}
+      {steps.map((item, index) => {
+        const active = page === item.step;
+        const completed = page > item.step;
+        return (
+          <React.Fragment key={item.step}>
+            <View style={[styles.progressPill, completed && styles.progressPillDone, active && styles.progressPillActive]}>
+              <Text style={[styles.progressPillText, completed && styles.progressPillTextDone, active && styles.progressPillTextActive]}>
+                {item.step} {item.label}
+              </Text>
+            </View>
+            {index < steps.length - 1 ? <View style={[styles.progressLine, (completed || active) && styles.progressLineActive]} /> : null}
+          </React.Fragment>
+        );
+      })}
     </View>
   );
 }
@@ -838,11 +863,15 @@ const styles = StyleSheet.create({
   eyebrow: { color: '#2563EB', fontWeight: '800', fontSize: 12 },
   title: { marginTop: 4, fontSize: 28, fontWeight: '900', color: '#0F172A' },
   subtitle: { marginTop: 8, color: '#64748B', fontSize: 14, lineHeight: 21 },
-  progressRow: { flexDirection: 'row', gap: 8, marginTop: 14 },
-  progressDot: { width: 28, height: 28, borderRadius: 999, borderWidth: 1, borderColor: '#CBD5E1', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
-  progressDotActive: { backgroundColor: '#2563EB', borderColor: '#2563EB' },
-  progressDotText: { color: '#64748B', fontSize: 12, fontWeight: '900' },
-  progressDotTextActive: { color: '#FFFFFF' },
+  progressRow: { flexDirection: 'row', alignItems: 'center', marginTop: 14 },
+  progressPill: { borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 999, paddingHorizontal: 9, paddingVertical: 7, backgroundColor: '#FFFFFF' },
+  progressPillDone: { borderColor: '#2563EB', backgroundColor: '#EFF6FF' },
+  progressPillActive: { borderWidth: 2, borderColor: '#2563EB', backgroundColor: '#2563EB' },
+  progressPillText: { color: '#64748B', fontSize: 11, fontWeight: '900' },
+  progressPillTextDone: { color: '#2563EB' },
+  progressPillTextActive: { color: '#FFFFFF' },
+  progressLine: { flex: 1, height: 2, marginHorizontal: 4, backgroundColor: '#CBD5E1' },
+  progressLineActive: { backgroundColor: '#93C5FD' },
   messageBox: { marginTop: 14, borderRadius: 8, padding: 12, borderWidth: 1 },
   errorBox: { backgroundColor: '#FEF2F2', borderColor: '#FECACA' },
   successBox: { backgroundColor: '#ECFDF5', borderColor: '#BBF7D0' },
@@ -853,9 +882,10 @@ const styles = StyleSheet.create({
   compactCard: { marginTop: 12, backgroundColor: '#FFFFFF', borderRadius: 8, padding: 12, borderWidth: 1, borderColor: '#E2E8F0' },
   compactTitle: { color: '#0F172A', fontSize: 15, fontWeight: '900' },
   cardTitle: { color: '#0F172A', fontSize: 17, fontWeight: '900' },
+  pageDescription: { marginTop: 8, color: '#475569', fontSize: 13, lineHeight: 19, fontWeight: '700' },
   modeStack: { gap: 10, marginTop: 12 },
   modeCard: { borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, padding: 14, backgroundColor: '#FFFFFF' },
-  activeModeCard: { borderColor: '#2563EB', backgroundColor: '#EFF6FF' },
+  activeModeCard: { borderWidth: 2, borderColor: '#2563EB', backgroundColor: '#EFF6FF' },
   modeTitle: { color: '#0F172A', fontSize: 16, fontWeight: '900' },
   activeModeText: { color: '#2563EB' },
   modeHint: { marginTop: 6, color: '#64748B', fontSize: 12, lineHeight: 17 },
@@ -872,9 +902,10 @@ const styles = StyleSheet.create({
   roundSummaryTitle: { color: '#0F172A', fontWeight: '900', fontSize: 13 },
   roundSummaryMeta: { color: '#2563EB', fontWeight: '900', fontSize: 12 },
   roundBox: { marginTop: 10, borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 8, backgroundColor: '#FFFFFF' },
-  roundHeader: { padding: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
-  roundTitle: { flex: 1, color: '#0F172A', fontSize: 14, fontWeight: '900' },
-  roundMeta: { color: '#64748B', fontSize: 12, fontWeight: '800' },
+  roundHeader: { padding: 12, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  roundHeaderCopy: { flex: 1 },
+  roundTitle: { color: '#0F172A', fontSize: 14, fontWeight: '900' },
+  roundMeta: { marginTop: 5, color: '#64748B', fontSize: 12, fontWeight: '800' },
   roundBody: { borderTopWidth: 1, borderTopColor: '#F1F5F9', padding: 12 },
   roundChipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
   roundChip: { borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: '#FFFFFF' },
