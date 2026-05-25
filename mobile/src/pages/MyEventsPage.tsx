@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { errorMessage } from '../lib/account';
 import { backendApi } from '../lib/backend';
-import { eventDisplaySortRank, formatCompactEventRange, formatEventCategory, getEventDisplayStatus } from '../lib/ticketDisplay';
+import { formatEventCategory, formatNextRoundLabel, getEventDisplayStatus, getNextRoundTime, operationSortRank } from '../lib/ticketDisplay';
 import type { EventSummary } from '../types/api';
 
 const PAGE_SIZE = 8;
@@ -74,10 +74,10 @@ export default function MyEventsPage({ navigation }: any) {
         return !normalized || haystack.includes(normalized);
       })
       .sort((a, b) => {
-        const rankDiff = eventDisplaySortRank(a) - eventDisplaySortRank(b);
+        const rankDiff = operationSortRank(a) - operationSortRank(b);
         if (rankDiff !== 0) return rankDiff;
-        const aTime = new Date(eventStart(a)).getTime();
-        const bTime = new Date(eventStart(b)).getTime();
+        const aTime = getNextRoundTime(a);
+        const bTime = getNextRoundTime(b);
         return (Number.isNaN(aTime) ? Number.MAX_SAFE_INTEGER : aTime) - (Number.isNaN(bTime) ? Number.MAX_SAFE_INTEGER : bTime);
       });
   }, [events, query, showExpired]);
@@ -141,7 +141,7 @@ export default function MyEventsPage({ navigation }: any) {
             </View>
             <Text style={styles.eventTitle}>{eventTitle(item)}</Text>
             <Text style={styles.eventMeta}>장소 {item.venue || '-'}</Text>
-            <Text style={styles.eventMeta}>{formatCompactEventRange(eventStart(item), eventEnd(item))}</Text>
+            <Text style={styles.eventMeta}>{formatNextRoundLabel(item)}</Text>
           </TouchableOpacity>
         )}
         ListEmptyComponent={(

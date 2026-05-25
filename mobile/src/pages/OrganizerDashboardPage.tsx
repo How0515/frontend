@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { accountStatusMessage, errorMessage } from '../lib/account';
 import { backendApi } from '../lib/backend';
-import { eventDisplaySortRank, formatCompactEventRange, formatEventCategory, getEventDisplayStatus } from '../lib/ticketDisplay';
+import { formatEventCategory, formatNextRoundLabel, getEventDisplayStatus, getNextRoundTime, operationSortRank } from '../lib/ticketDisplay';
 import type { EventSummary, OrganizerApplication, UserProfile } from '../types/api';
 
 function eventTitle(event: EventSummary) {
@@ -28,6 +28,12 @@ function eventEnd(event: EventSummary) {
   return event.eventEndAt || event.endsAt || event.eventAt || event.eventDateTime || '';
 }
 
+function isCurrentOperationEvent(event: EventSummary) {
+  if (String(event.status ?? '').toUpperCase() === 'CANCELLED') return false;
+  const endTime = new Date(eventEnd(event)).getTime();
+  return Number.isNaN(endTime) || endTime >= Date.now();
+}
+
 function categoryLabel(category?: string) {
   const label = formatEventCategory(category);
   return label === '페스티벌' ? '기타' : label;
@@ -35,10 +41,10 @@ function categoryLabel(category?: string) {
 
 function sortEventsForOperation(events: EventSummary[]) {
   return [...events].sort((a, b) => {
-    const rankDiff = eventDisplaySortRank(a) - eventDisplaySortRank(b);
+    const rankDiff = operationSortRank(a) - operationSortRank(b);
     if (rankDiff !== 0) return rankDiff;
-    const aTime = new Date(a.eventAt || a.eventDateTime || '').getTime();
-    const bTime = new Date(b.eventAt || b.eventDateTime || '').getTime();
+    const aTime = getNextRoundTime(a);
+    const bTime = getNextRoundTime(b);
     return (Number.isNaN(aTime) ? Number.MAX_SAFE_INTEGER : aTime) - (Number.isNaN(bTime) ? Number.MAX_SAFE_INTEGER : bTime);
   });
 }
@@ -91,7 +97,7 @@ export default function OrganizerDashboardPage({ navigation }: any) {
 
       if (me.roles?.includes('ORGANIZER') || me.roles?.includes('ADMIN')) {
         const eventPage = await backendApi.getMyEvents({ page: 0, size: 5 });
-        const myEvents = sortEventsForOperation(eventPage.items ?? []);
+        const myEvents = sortEventsForOperation((eventPage.items ?? []).filter(isCurrentOperationEvent));
         setEvents(myEvents);
 
         const ticketLists = await Promise.all(
@@ -242,7 +248,7 @@ export default function OrganizerDashboardPage({ navigation }: any) {
         <>
           <View style={styles.metricGrid}>
             <Metric label="총 이벤트" value={events.length} />
-            <Metric label="게시중 이벤트" value={activeEvents} />
+            <Metric label="운영 이벤트" value={activeEvents} />
             <Metric label="판매 중 티켓" value={ticketMetrics.sellingTickets} />
           </View>
           <View style={[styles.metricGrid, { marginTop: 8 }]}> 
@@ -262,7 +268,7 @@ export default function OrganizerDashboardPage({ navigation }: any) {
 
           <View style={styles.card}>
             <View style={styles.sectionHead}>
-              <Text style={styles.cardTitle}>최근 이벤트</Text>
+              <Text style={styles.cardTitle}>현재 운영 이벤트</Text>
             </View>
 
             {events.length === 0 ? (
@@ -274,7 +280,7 @@ export default function OrganizerDashboardPage({ navigation }: any) {
                     <Text style={styles.eventCategory}>{categoryLabel(event.category)}</Text>
                     <Text style={styles.eventTitle}>{eventTitle(event)}</Text>
                     <Text style={styles.eventMeta}>장소 {event.venue || '-'}</Text>
-                    <Text style={styles.eventMeta}>{formatCompactEventRange(eventStart(event), eventEnd(event))}</Text>
+                    <Text style={styles.eventMeta}>{formatNextRoundLabel(event)}</Text>
                   </View>
                   <Text style={styles.badge}>{getEventDisplayStatus(event).label}</Text>
                 </TouchableOpacity>

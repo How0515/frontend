@@ -54,11 +54,6 @@ export default function OrganizerProfilePage({ navigation }: any) {
     }
   };
 
-  const cancelEdit = () => {
-    setDisplayNameDraft(profile?.displayName || '');
-    setEditing(false);
-  };
-
   if (loading) {
     return (
       <View style={styles.center}>
@@ -76,33 +71,32 @@ export default function OrganizerProfilePage({ navigation }: any) {
     >
       <Text style={styles.eyebrow}>My Account</Text>
       <Text style={styles.title}>내 정보</Text>
-      <Text style={styles.subtitle}>주최자 계정 정보를 확인하고 표시 이름을 수정할 수 있습니다.</Text>
+      <Text style={styles.subtitle}>계정 정보와 표시 이름을 관리합니다.</Text>
 
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>계정 정보</Text>
-        <Text style={styles.label}>이메일 또는 지갑</Text>
-        <Text style={styles.value}>{profile?.email || profile?.walletAddress || '-'}</Text>
-
-        <Text style={styles.label}>권한</Text>
-        <Text style={styles.value}>{formatRoles(profile?.roles)}</Text>
-
         <Text style={styles.label}>표시 이름</Text>
         {editing ? (
           <TextInput style={styles.input} value={displayNameDraft} onChangeText={setDisplayNameDraft} placeholder="표시 이름" />
         ) : (
-          <Text style={styles.value}>{profile?.displayName || '-'}</Text>
+          <Text style={styles.displayName}>{profile?.displayName || '-'}</Text>
         )}
+
+        <Text style={styles.label}>이메일 / 지갑</Text>
+        <Text style={styles.value}>{profile?.email || profile?.walletAddress || '-'}</Text>
+
+        <Text style={styles.label}>사용 중 역할</Text>
+        <Text style={styles.value}>{formatRoles(profile?.roles)}</Text>
 
         {!editing ? (
           <TouchableOpacity style={styles.primaryButton} onPress={() => setEditing(true)}>
-            <Text style={styles.primaryButtonText}>정보 수정하기</Text>
+            <Text style={styles.primaryButtonText}>표시 이름 수정</Text>
           </TouchableOpacity>
         ) : (
           <View style={styles.editRow}>
             <TouchableOpacity style={[styles.primaryButton, styles.editButton]} onPress={save} disabled={saving}>
               <Text style={styles.primaryButtonText}>{saving ? '저장 중...' : '저장'}</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.secondaryButton, styles.editButton]} onPress={cancelEdit} disabled={saving}>
+            <TouchableOpacity style={[styles.secondaryButton, styles.editButton]} onPress={() => { setDisplayNameDraft(profile?.displayName || ''); setEditing(false); }} disabled={saving}>
               <Text style={styles.secondaryButtonText}>취소</Text>
             </TouchableOpacity>
           </View>
@@ -110,9 +104,12 @@ export default function OrganizerProfilePage({ navigation }: any) {
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>화면 이동</Text>
+        <Text style={styles.cardTitle}>역할 전환</Text>
         <TouchableOpacity style={styles.secondaryButton} onPress={() => navigation.navigate('Main')}>
-          <Text style={styles.secondaryButtonText}>사용자 메인 이동</Text>
+          <Text style={styles.secondaryButtonText}>사용자 화면으로</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.secondaryButton} onPress={() => navigation.navigate('Organizer')}>
+          <Text style={styles.secondaryButtonText}>주최자 센터로</Text>
         </TouchableOpacity>
       </View>
 
@@ -128,20 +125,21 @@ const styles = StyleSheet.create({
   content: { padding: 18, paddingBottom: 96 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20, backgroundColor: '#F4F7FB' },
   loadingText: { marginTop: 12, color: '#64748B' },
-  eyebrow: { color: '#2563EB', fontWeight: '800', fontSize: 12, letterSpacing: 0.5 },
+  eyebrow: { color: '#2563EB', fontWeight: '800', fontSize: 12 },
   title: { marginTop: 4, fontSize: 28, fontWeight: '900', color: '#0F172A' },
   subtitle: { marginTop: 8, color: '#64748B', fontSize: 14, lineHeight: 21 },
-  card: { marginTop: 18, backgroundColor: '#FFFFFF', borderRadius: 18, padding: 16, borderWidth: 1, borderColor: '#E2E8F0' },
+  card: { marginTop: 14, backgroundColor: '#FFFFFF', borderRadius: 14, padding: 16, borderWidth: 1, borderColor: '#E2E8F0' },
   cardTitle: { color: '#0F172A', fontSize: 17, fontWeight: '900' },
   label: { marginTop: 10, color: '#64748B', fontSize: 12, fontWeight: '800' },
+  displayName: { marginTop: 5, color: '#0F172A', fontSize: 24, fontWeight: '900' },
   value: { marginTop: 5, color: '#0F172A', fontSize: 15, fontWeight: '800' },
   input: { marginTop: 7, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 12, padding: 12, backgroundColor: '#FFFFFF', color: '#0F172A' },
-  primaryButton: { backgroundColor: '#2563EB', borderRadius: 14, paddingVertical: 14, alignItems: 'center', marginTop: 16 },
+  primaryButton: { backgroundColor: '#2563EB', borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginTop: 16 },
   primaryButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '900' },
-  secondaryButton: { borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 14, paddingVertical: 14, alignItems: 'center', marginTop: 10, backgroundColor: '#FFFFFF' },
+  secondaryButton: { borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginTop: 10, backgroundColor: '#FFFFFF' },
   secondaryButtonText: { color: '#0F172A', fontSize: 16, fontWeight: '900' },
   editRow: { flexDirection: 'row', gap: 8, marginTop: 16 },
   editButton: { flex: 1, marginTop: 0 },
-  logoutButton: { backgroundColor: '#FEF2F2', borderWidth: 1, borderColor: '#FECACA', borderRadius: 14, paddingVertical: 14, alignItems: 'center', marginTop: 14 },
+  logoutButton: { backgroundColor: '#FEF2F2', borderWidth: 1, borderColor: '#FECACA', borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginTop: 14 },
   logoutButtonText: { color: '#DC2626', fontSize: 16, fontWeight: '900' },
 });

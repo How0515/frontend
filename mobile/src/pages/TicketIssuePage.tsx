@@ -710,7 +710,7 @@ export default function TicketIssuePage({ navigation, route }: any) {
   const reopenTicketConfig = async () => {
     if (issueCompleted) {
       if (lastIssuedTicketIds.length === 0) {
-        showError('방금 발행한 티켓 정보를 확인할 수 없어 취소할 수 없습니다. 발행 현황에서 확인해주세요.');
+        showError('방금 발행한 티켓 정보를 확인할 수 없어 취소할 수 없습니다. 티켓 판매 현황에서 확인해주세요.');
         return;
       }
       const confirmed = await confirmAction(
@@ -750,7 +750,7 @@ export default function TicketIssuePage({ navigation, route }: any) {
         ? '각 회차마다 티켓 수를 설정할 수 있습니다.'
         : '모든 회차에 동일한 티켓 수가 적용됩니다.'
       : '좌석 구역을 선택한 뒤 판매할 티켓 상품을 저장하세요.';
-  const topSubtitle = '티켓 판매 규칙을 단계별로 설정합니다.';
+  const topSubtitle = '티켓 발행과 판매 정책을 단계별로 설정합니다.';
   const canRevealQuantity = !!sectionNameOf(currentDraft);
   const canRevealPrice = canRevealQuantity && isPositiveInteger(currentDraft.quantity);
   const canRevealResale = canRevealPrice && isPositiveNumber(currentDraft.priceEth) && !!currentDraft.saleStartDate && !!currentDraft.saleEndDate;
@@ -1156,7 +1156,7 @@ export default function TicketIssuePage({ navigation, route }: any) {
               disabled={!issueCompleted}
               onPress={() => navigation.navigate('TicketExplore', { eventId })}
             >
-              <Text style={styles.primaryButtonText}>다음: 티켓 발행 현황보기</Text>
+              <Text style={styles.primaryButtonText}>다음: 티켓 판매 현황</Text>
             </TouchableOpacity>
           </View>
         ) : null}

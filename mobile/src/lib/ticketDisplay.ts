@@ -168,11 +168,16 @@ export function getEventDisplayStatus(event?: EventSummary | null, now = new Dat
   const firstStart = roundStarts.length ? Math.min(...roundStarts) : timeOf(event.eventStartAt || event.startsAt || event.eventAt || event.eventDateTime);
   const lastEnd = roundEnds.length ? Math.max(...roundEnds) : timeOf(event.eventEndAt || event.endsAt || event.eventAt || event.eventDateTime);
 
+  const total = Number(event.totalTicketCount ?? 0);
+  const remaining = Number(event.remainingTicketCount ?? 0);
+  const issued = total > 0 ? total - remaining : 0;
+
+  if (issued <= 0) return { label: '티켓 미발행', tone: 'gray' };
   if (!Number.isNaN(firstStart) && !Number.isNaN(lastEnd) && current >= firstStart && current <= lastEnd) {
     return { label: '공연 중', tone: 'green' };
   }
   if (!Number.isNaN(lastEnd) && current > lastEnd) return { label: '종료', tone: 'gray' };
-  if (event.soldOut || event.remainingTicketCount === 0) return { label: '매진', tone: 'red' };
+  if ((event.soldOut || remaining === 0) && issued > 0) return { label: '매진', tone: 'red' };
 
   const saleStart = event.salesStartAt || event.primarySaleStart;
   const saleEnd = event.salesEndAt || event.primarySaleEnd;
@@ -183,6 +188,42 @@ export function getEventDisplayStatus(event?: EventSummary | null, now = new Dat
   if (!Number.isNaN(saleStartTime) || !Number.isNaN(saleEndTime)) return { label: '판매 중', tone: 'blue' };
 
   return { label: '판매 예정', tone: 'yellow' };
+}
+
+export function getSalesDisplayStatus(event?: EventSummary | null, now = new Date()): DisplayStatus {
+  if (!event) return { label: '-', tone: 'gray' };
+  const status = normalized(event.status);
+  if (status === 'CANCELLED') return { label: '취소', tone: 'red' };
+  if (status === 'DRAFT' || status === 'INACTIVE') return { label: '티켓 미발행', tone: 'gray' };
+
+  const total = Number(event.totalTicketCount ?? 0);
+  const remaining = Number(event.remainingTicketCount ?? 0);
+  const issued = total > 0 ? total - remaining : 0;
+  if (issued <= 0) return { label: '티켓 미발행', tone: 'gray' };
+  if (remaining <= 0) return { label: '매진', tone: 'red' };
+
+  const current = now.getTime();
+  const saleStartTime = timeOf(event.salesStartAt || event.primarySaleStart);
+  const saleEndTime = timeOf(event.salesEndAt || event.primarySaleEnd);
+  if (!Number.isNaN(saleStartTime) && current < saleStartTime) return { label: '판매 예정', tone: 'yellow' };
+  if (!Number.isNaN(saleEndTime) && current > saleEndTime) return { label: '판매 종료', tone: 'gray' };
+  return { label: '판매 중', tone: 'blue' };
+}
+
+export function getNextRoundTime(event?: EventSummary | null, now = new Date()) {
+  if (!event) return timeOf(null);
+  const current = now.getTime();
+  const starts = event.rounds?.map(roundStartAt).filter((value) => !Number.isNaN(value)).sort((a, b) => a - b) ?? [];
+  const next = starts.find((value) => value >= current);
+  if (next !== undefined) return next;
+  if (starts.length) return starts[starts.length - 1];
+  return timeOf(event.eventStartAt || event.startsAt || event.eventAt || event.eventDateTime);
+}
+
+export function formatNextRoundLabel(event?: EventSummary | null, now = new Date()) {
+  const nextTime = getNextRoundTime(event, now);
+  if (Number.isNaN(nextTime)) return '다음 회차 · -';
+  return `다음 회차 · ${formatCompactDateTime(new Date(nextTime).toISOString())}`;
 }
 
 export function getOrganizerEventDisplayStatus(event?: EventSummary | null, tickets: TicketDetail[] = [], now = new Date()): DisplayStatus {
@@ -211,12 +252,14 @@ export function getTicketDisplayStatus(ticket?: TicketDetail | null): DisplaySta
 export function eventDisplaySortRank(event?: EventSummary | null, now = new Date()) {
   const status = getEventDisplayStatus(event, now).label;
   const ranks: Record<string, number> = {
-    '공연 중': 0,
-    '판매 중': 1,
-    '판매 예정': 2,
-    '매진': 3,
-    종료: 5,
-    취소: 6,
+    취소: 0,
+    종료: 1,
+    '티켓 미발행': 2,
+    '공연 중': 3,
+    '판매 예정': 4,
+    '판매 중': 5,
+    매진: 6,
+    '판매 종료': 7,
   };
   if (status === '종료') {
     const end = event?.eventEndAt || event?.endsAt || event?.eventAt || event?.eventDateTime;
@@ -225,6 +268,34 @@ export function eventDisplaySortRank(event?: EventSummary | null, now = new Date
     if (!Number.isNaN(endTime) && endTime >= soonThreshold) return 4;
   }
   return ranks[status] ?? 2;
+}
+
+export function operationSortRank(event?: EventSummary | null, now = new Date()) {
+  const status = getEventDisplayStatus(event, now).label;
+  const ranks: Record<string, number> = {
+    '공연 중': 0,
+    '판매 중': 1,
+    '판매 예정': 2,
+    매진: 3,
+    종료: 4,
+    취소: 5,
+    '티켓 미발행': 6,
+    '판매 종료': 7,
+  };
+  return ranks[status] ?? 6;
+}
+
+export function salesSortRank(event?: EventSummary | null, now = new Date()) {
+  const status = getSalesDisplayStatus(event, now).label;
+  const ranks: Record<string, number> = {
+    '판매 중': 0,
+    '판매 예정': 1,
+    매진: 2,
+    '판매 종료': 3,
+    '티켓 미발행': 4,
+    취소: 5,
+  };
+  return ranks[status] ?? 4;
 }
 
 export function weiToEth(wei?: string | number | null) {

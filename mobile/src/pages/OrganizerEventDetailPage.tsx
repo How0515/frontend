@@ -152,7 +152,7 @@ export default function OrganizerEventDetailPage({ navigation, route }: any) {
             <Text style={styles.primaryButtonText}>티켓 발행</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.secondaryButton} onPress={() => navigation.navigate('SalesStatus', { eventId: event.id })}>
-            <Text style={styles.secondaryButtonText}>티켓 발행 현황</Text>
+            <Text style={styles.secondaryButtonText}>티켓 판매 현황</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.secondaryButton} onPress={() => navigation.navigate('CheckInStatus', { eventId: event.id })}>
             <Text style={styles.secondaryButtonText}>체크인 현황</Text>

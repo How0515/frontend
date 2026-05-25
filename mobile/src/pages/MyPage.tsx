@@ -38,11 +38,7 @@ export default function MyPage({ navigation }: any) {
     }
   }, []);
 
-  useFocusEffect(
-    useCallback(() => {
-      void loadProfile();
-    }, [loadProfile]),
-  );
+  useFocusEffect(useCallback(() => { void loadProfile(); }, [loadProfile]));
 
   const save = async () => {
     setSaving(true);
@@ -59,25 +55,18 @@ export default function MyPage({ navigation }: any) {
     }
   };
 
-  const cancelEdit = () => {
-    setDisplayNameDraft(profile?.displayName || '');
-    setEditing(false);
-  };
-
   const handleLogout = async () => {
     await clearAccessToken();
     navigation.replace('Landing');
   };
 
-  if (loading) {
-    return <View style={styles.center}><ActivityIndicator size="large" color="#2563EB" /></View>;
-  }
+  if (loading) return <View style={styles.center}><ActivityIndicator size="large" color="#2563EB" /></View>;
 
   const quickLinks = [
-    { id: 'home', label: '이벤트 메인 이동', screen: 'Main' },
-    { id: 'resale', label: '내 리셀 티켓', screen: 'ResaleList', params: { scope: 'mine' } },
-    { id: 'tickets', label: '내 티켓 목록', screen: 'MyTickets' },
-    { id: 'disputes', label: '내 분쟁 신고', screen: 'MyDisputes' },
+    { id: 'home', label: '사용자 홈으로', screen: 'Main' },
+    { id: 'tickets', label: '내 티켓', screen: 'MyTickets' },
+    { id: 'resale', label: '리셀 목록', screen: 'ResaleList', params: { scope: 'mine' } },
+    { id: 'disputes', label: '내 분쟁', screen: 'MyDisputes' },
   ];
 
   return (
@@ -88,32 +77,32 @@ export default function MyPage({ navigation }: any) {
     >
       <Text style={styles.eyebrow}>My Account</Text>
       <Text style={styles.title}>내 정보</Text>
+      <Text style={styles.subtitle}>계정 정보와 표시 이름을 관리합니다.</Text>
 
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>계정 정보</Text>
-        <Text style={styles.label}>이메일 또는 지갑</Text>
-        <Text style={styles.value}>{profile?.email || profile?.walletAddress || '-'}</Text>
-
-        <Text style={styles.label}>권한</Text>
-        <Text style={styles.value}>{formatRoles(profile?.roles)}</Text>
-
         <Text style={styles.label}>표시 이름</Text>
         {editing ? (
           <TextInput style={styles.input} value={displayNameDraft} onChangeText={setDisplayNameDraft} placeholder="표시 이름" />
         ) : (
-          <Text style={styles.value}>{profile?.displayName || '-'}</Text>
+          <Text style={styles.displayName}>{profile?.displayName || '-'}</Text>
         )}
+
+        <Text style={styles.label}>이메일 / 지갑</Text>
+        <Text style={styles.value}>{profile?.email || profile?.walletAddress || '-'}</Text>
+
+        <Text style={styles.label}>사용 중 역할</Text>
+        <Text style={styles.value}>{formatRoles(profile?.roles)}</Text>
 
         {!editing ? (
           <TouchableOpacity style={styles.primaryButton} onPress={() => setEditing(true)}>
-            <Text style={styles.primaryButtonText}>정보 수정</Text>
+            <Text style={styles.primaryButtonText}>표시 이름 수정</Text>
           </TouchableOpacity>
         ) : (
           <View style={styles.editRow}>
             <TouchableOpacity style={[styles.primaryButton, styles.editButton]} onPress={save} disabled={saving}>
               <Text style={styles.primaryButtonText}>{saving ? '저장 중...' : '저장'}</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.secondaryButton, styles.editButton]} onPress={cancelEdit} disabled={saving}>
+            <TouchableOpacity style={[styles.secondaryButton, styles.editButton]} onPress={() => { setDisplayNameDraft(profile?.displayName || ''); setEditing(false); }} disabled={saving}>
               <Text style={styles.secondaryButtonText}>취소</Text>
             </TouchableOpacity>
           </View>
@@ -121,7 +110,7 @@ export default function MyPage({ navigation }: any) {
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>내 활동</Text>
+        <Text style={styles.cardTitle}>화면 전환</Text>
         {quickLinks.map((item) => (
           <TouchableOpacity key={item.id} style={styles.menuItem} onPress={() => navigation.navigate(item.screen, item.params)}>
             <Text style={styles.menuLabel}>{item.label}</Text>
@@ -131,7 +120,7 @@ export default function MyPage({ navigation }: any) {
       </View>
 
       <TouchableOpacity style={styles.secondaryButton} onPress={() => navigation.navigate('Organizer')}>
-        <Text style={styles.secondaryButtonText}>주최자 센터로 이동</Text>
+        <Text style={styles.secondaryButtonText}>주최자 화면으로</Text>
       </TouchableOpacity>
 
       <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
@@ -147,20 +136,22 @@ const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F4F7FB' },
   eyebrow: { color: '#2563EB', fontWeight: '800', fontSize: 12 },
   title: { marginTop: 4, fontSize: 28, fontWeight: '900', color: '#0F172A' },
-  card: { marginTop: 14, backgroundColor: '#FFFFFF', borderRadius: 18, padding: 16, borderWidth: 1, borderColor: '#E2E8F0' },
+  subtitle: { marginTop: 8, color: '#64748B', fontSize: 14, lineHeight: 21 },
+  card: { marginTop: 14, backgroundColor: '#FFFFFF', borderRadius: 14, padding: 16, borderWidth: 1, borderColor: '#E2E8F0' },
   cardTitle: { color: '#0F172A', fontSize: 17, fontWeight: '900' },
   label: { marginTop: 10, color: '#64748B', fontSize: 12, fontWeight: '800' },
+  displayName: { marginTop: 5, color: '#0F172A', fontSize: 24, fontWeight: '900' },
   value: { marginTop: 5, color: '#0F172A', fontSize: 15, fontWeight: '800' },
   input: { marginTop: 7, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 12, padding: 12, backgroundColor: '#FFFFFF', color: '#0F172A' },
-  primaryButton: { marginTop: 12, backgroundColor: '#2563EB', borderRadius: 14, paddingVertical: 14, alignItems: 'center' },
+  primaryButton: { marginTop: 12, backgroundColor: '#2563EB', borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
   primaryButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '900' },
-  secondaryButton: { marginTop: 10, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 14, paddingVertical: 14, alignItems: 'center', backgroundColor: '#FFFFFF' },
+  secondaryButton: { marginTop: 10, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 12, paddingVertical: 14, alignItems: 'center', backgroundColor: '#FFFFFF' },
   secondaryButtonText: { color: '#0F172A', fontSize: 16, fontWeight: '900' },
   editRow: { flexDirection: 'row', gap: 8, marginTop: 12 },
   editButton: { flex: 1, marginTop: 0 },
   menuItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, borderTopWidth: 1, borderTopColor: '#F1F5F9' },
   menuLabel: { flex: 1, fontSize: 15, color: '#0F172A', fontWeight: '800' },
   arrow: { color: '#94A3B8', fontSize: 22 },
-  logoutButton: { marginTop: 20, borderWidth: 1, borderColor: '#FCA5A5', borderRadius: 14, paddingVertical: 14, alignItems: 'center', backgroundColor: '#FEF2F2' },
+  logoutButton: { marginTop: 20, borderWidth: 1, borderColor: '#FCA5A5', borderRadius: 12, paddingVertical: 14, alignItems: 'center', backgroundColor: '#FEF2F2' },
   logoutText: { color: '#DC2626', fontWeight: '900', fontSize: 15 },
 });
