@@ -17,7 +17,7 @@ import { formatEventRange, formatSalesStatus } from '../lib/ticketDisplay';
 import type { EventSummary } from '../types/api';
 
 const PAGE_SIZE = 8;
-const EXPIRED_STATUSES = new Set(['ENDED', 'CANCELED', 'CANCELLED']);
+const EXPIRED_STATUSES = new Set(['CANCELLED']);
 
 function eventTitle(event: EventSummary) {
   return event.name || event.title || '제목 없는 이벤트';

@@ -44,7 +44,7 @@ export default function CheckInHomePage({ navigation }: any) {
     try {
       const page = await backendApi.getMyEvents({ page: 0, size: 12 });
       const myEvents = page.items ?? [];
-      const activeEvents = myEvents.filter((event) => event.status === 'ACTIVE');
+      const activeEvents = myEvents.filter((event) => event.status === 'PUBLISHED');
       setEvents(activeEvents);
 
       const targetForHistory = activeEvents.slice(0, 5);
@@ -85,8 +85,8 @@ export default function CheckInHomePage({ navigation }: any) {
   const todayEvents = useMemo(() => events.filter((event) => isToday(event.eventAt || event.eventDateTime)), [events]);
   const sortedTodayEvents = useMemo(() => {
     return [...todayEvents].sort((a, b) => {
-      if (a.status === 'ACTIVE' && b.status !== 'ACTIVE') return -1;
-      if (a.status !== 'ACTIVE' && b.status === 'ACTIVE') return 1;
+      if (a.status === 'PUBLISHED' && b.status !== 'PUBLISHED') return -1;
+      if (a.status !== 'PUBLISHED' && b.status === 'PUBLISHED') return 1;
       const aTime = new Date(a.eventAt || a.eventDateTime || '').getTime();
       const bTime = new Date(b.eventAt || b.eventDateTime || '').getTime();
       return (Number.isNaN(aTime) ? 0 : aTime) - (Number.isNaN(bTime) ? 0 : bTime);

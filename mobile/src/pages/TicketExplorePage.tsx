@@ -13,7 +13,7 @@ const STATUS_FILTERS = [
   { value: 'LISTED', label: '리셀 중' },
   { value: 'SOLD', label: '판매 완료' },
   { value: 'USED', label: '사용 완료' },
-  { value: 'CANCELED', label: '취소' },
+  { value: 'CANCELLED', label: '취소' },
 ] as const;
 
 type SortMode = 'latest' | 'priceAsc' | 'priceDesc' | 'seat';

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { backendApi } from '../lib/backend';
-import { formatEventDate, formatTicketStatus } from '../lib/ticketDisplay';
+import { formatEventDate, getTicketDisplayStatus } from '../lib/ticketDisplay';
 import type { EventDetail, TicketDetail } from '../types/api';
 
 function eventDate(ticket: TicketDetail, event?: EventDetail) {
@@ -34,15 +34,15 @@ export default function MyTicketsPage({ navigation }: any) {
 
   const filteredTickets = useMemo(() => {
     if (statusFilter === 'ALL') return tickets;
-    if (statusFilter === 'OWNED') return tickets.filter((ticket) => ['ISSUED', 'OWNED', 'SOLD'].includes(String(ticket.status).toUpperCase()));
+    if (statusFilter === 'OWNED') return tickets.filter((ticket) => String(ticket.status).toUpperCase() === 'SOLD');
     if (statusFilter === 'LISTED') return tickets.filter((ticket) => String(ticket.status).toUpperCase() === 'LISTED');
-    if (statusFilter === 'USED') return tickets.filter((ticket) => ['USED', 'EXPIRED'].includes(String(ticket.status).toUpperCase()));
+    if (statusFilter === 'USED') return tickets.filter((ticket) => String(ticket.status).toUpperCase() === 'USED');
     return tickets;
   }, [statusFilter, tickets]);
 
   const renderTicket = ({ item }: { item: TicketDetail }) => {
     const event = eventsById[item.eventId];
-    const status = formatTicketStatus(item.status);
+    const status = getTicketDisplayStatus(item).label;
     return (
       <TouchableOpacity style={styles.ticketCard} onPress={() => navigation.navigate('TicketDetail', { ticketId: item.id ?? item.ticketId })}>
         <View style={styles.ticketInfo}>

@@ -25,7 +25,7 @@ export default function OrganizerEventDetailPage({ navigation, route }: any) {
   const [tickets, setTickets] = useState<TicketDetail[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [statusDraft, setStatusDraft] = useState('ACTIVE');
+  const [statusDraft, setStatusDraft] = useState('PUBLISHED');
   const [statusSaving, setStatusSaving] = useState(false);
 
   const soldTickets = tickets.filter((ticket) => ticket.status === 'SOLD' || ticket.status === 'LISTED' || ticket.status === 'USED').length;
@@ -46,7 +46,7 @@ export default function OrganizerEventDetailPage({ navigation, route }: any) {
       const detail = await backendApi.getEvent(eventId);
       const eventTickets = await backendApi.getEventTickets(eventId).catch(() => []);
       setEvent(detail);
-      setStatusDraft(detail.status || 'ACTIVE');
+      setStatusDraft(detail.status || 'PUBLISHED');
       setTickets(eventTickets);
     } catch (error: any) {
       Alert.alert('이벤트 로드 실패', errorMessage(error, '이벤트 정보를 불러오지 못했습니다.'));
@@ -69,7 +69,7 @@ export default function OrganizerEventDetailPage({ navigation, route }: any) {
 
   const saveStatus = async () => {
     if (!event) return;
-    if (event.adminCanceled && statusDraft !== 'CANCELED') {
+    if (event.adminCanceled && statusDraft !== 'CANCELLED') {
       Alert.alert('변경 불가', '관리자가 취소한 이벤트는 주최자가 복구할 수 없습니다.');
       return;
     }
@@ -128,14 +128,14 @@ export default function OrganizerEventDetailPage({ navigation, route }: any) {
         {event.adminCanceled ? <Text style={styles.warningText}>관리자가 취소한 이벤트는 주최자가 복구할 수 없습니다.</Text> : null}
         <View style={styles.statusGrid}>
           {[
-            { value: 'ACTIVE', label: '운영중' },
+            { value: 'PUBLISHED', label: '운영중' },
             { value: 'INACTIVE', label: '운영중지' },
-            { value: 'CANCELED', label: '이벤트 취소' },
+            { value: 'CANCELLED', label: '이벤트 취소' },
           ].map((item) => (
             <TouchableOpacity
               key={item.value}
               style={[styles.statusChip, statusDraft === item.value && styles.activeStatusChip]}
-              disabled={statusSaving || (event.adminCanceled === true && item.value !== 'CANCELED')}
+              disabled={statusSaving || (event.adminCanceled === true && item.value !== 'CANCELLED')}
               onPress={() => setStatusDraft(item.value)}
             >
               <Text style={[styles.statusChipText, statusDraft === item.value && styles.activeStatusChipText]}>{item.label}</Text>

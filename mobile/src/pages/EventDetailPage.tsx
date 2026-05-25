@@ -57,7 +57,7 @@ export default function EventDetailPage({ route, navigation }: any) {
   }, [eventId]);
 
   const availableTickets = useMemo(
-    () => tickets.filter((ticket) => ['ISSUED', 'AVAILABLE'].includes(String(ticket.status))),
+    () => tickets.filter((ticket) => String(ticket.status).toUpperCase() === 'AVAILABLE'),
     [tickets],
   );
 

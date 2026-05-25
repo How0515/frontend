@@ -35,8 +35,8 @@ function categoryLabel(category?: string) {
 
 function sortCanceledLast(events: EventSummary[]) {
   return [...events].sort((a, b) => {
-    if (a.status === 'CANCELED' && b.status !== 'CANCELED') return 1;
-    if (a.status !== 'CANCELED' && b.status === 'CANCELED') return -1;
+    if (a.status === 'CANCELLED' && b.status !== 'CANCELLED') return 1;
+    if (a.status !== 'CANCELLED' && b.status === 'CANCELLED') return -1;
     const aTime = new Date(a.eventAt || a.eventDateTime || '').getTime();
     const bTime = new Date(b.eventAt || b.eventDateTime || '').getTime();
     return (Number.isNaN(bTime) ? 0 : bTime) - (Number.isNaN(aTime) ? 0 : aTime);
@@ -72,7 +72,7 @@ export default function OrganizerDashboardPage({ navigation }: any) {
   const latestApplication = applications[0];
   const latestStatus = latestApplication?.status ?? null;
   const canApply = !latestApplication || latestStatus === 'REJECTED';
-  const activeEvents = events.filter((event) => event.status === 'ACTIVE').length;
+  const activeEvents = events.filter((event) => event.status === 'PUBLISHED').length;
   const [ticketMetrics, setTicketMetrics] = useState({
     sellingTickets: 0,
     soldTickets: 0,

@@ -34,7 +34,7 @@ export default function SalesStatusPage({ navigation, route }: any) {
     try {
       if (!eventId) {
         const page = await backendApi.getMyEvents({ page: 0, size: 20 });
-        const myEvents = (page.items ?? []).filter((item) => item.status !== 'CANCELED');
+        const myEvents = (page.items ?? []).filter((item) => item.status !== 'CANCELLED');
         setEvents(myEvents);
         setEvent(null);
         setTickets([]);

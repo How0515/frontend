@@ -41,7 +41,7 @@ function localBlockReason(ticket: TicketDetail | null, event: EventDetail | null
   if (status === 'LISTED') return '이미 판매 등록된 티켓입니다.';
   if (status === 'USED') return '사용 완료된 티켓은 리셀할 수 없습니다.';
   if (status === 'AVAILABLE') return '구매 완료된 본인 티켓만 리셀할 수 있습니다.';
-  if (event?.status && event.status !== 'ACTIVE') return '판매 가능한 이벤트의 티켓만 리셀할 수 있습니다.';
+  if (event?.status && event.status !== 'PUBLISHED') return '판매 가능한 이벤트의 티켓만 리셀할 수 있습니다.';
   if (event && event.resaleAllowed === false) return '리셀 정책상 판매가 제한된 티켓입니다.';
   if (event?.resaleStart && now < new Date(event.resaleStart).getTime()) return '아직 리셀 가능 기간이 아닙니다.';
   if (event?.resaleEnd && now > new Date(event.resaleEnd).getTime()) return '리셀 가능 기간이 종료되었습니다.';

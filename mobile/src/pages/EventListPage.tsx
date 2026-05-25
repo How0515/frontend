@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { backendApi } from '../lib/backend';
-import { formatEventDate } from '../lib/ticketDisplay';
+import { formatEventDate, getEventDisplayStatus } from '../lib/ticketDisplay';
 import type { EventSummary } from '../types/api';
 
 const CATEGORIES = [
@@ -14,19 +14,12 @@ const CATEGORIES = [
 
 const STATUS_FILTERS = [
   { id: 'ALL', label: '전체' },
-  { id: 'ACTIVE', label: '예매 가능' },
+  { id: 'PUBLISHED', label: '예매 가능' },
   { id: 'INACTIVE', label: '준비 중' },
 ] as const;
 
 function eventName(event: EventSummary) {
   return event.name || event.title || '이벤트';
-}
-
-function eventStatus(status?: string) {
-  if (status === 'ACTIVE') return '예매 가능';
-  if (status === 'INACTIVE') return '준비 중';
-  if (status === 'CANCELED' || status === 'CANCELLED') return '취소됨';
-  return status || '-';
 }
 
 export default function EventListPage({ navigation, route }: any) {
@@ -66,7 +59,7 @@ export default function EventListPage({ navigation, route }: any) {
     <TouchableOpacity style={styles.card} onPress={() => navigation.navigate('EventDetail', { eventId: item.id })}>
       <View style={styles.cardHeader}>
         <Text style={styles.category}>{item.category || 'EVENT'}</Text>
-        <Text style={styles.status}>{eventStatus(item.status)}</Text>
+        <Text style={styles.status}>{getEventDisplayStatus(item).label}</Text>
       </View>
       <Text style={styles.title}>{eventName(item)}</Text>
       <View style={styles.metaBlock}>
