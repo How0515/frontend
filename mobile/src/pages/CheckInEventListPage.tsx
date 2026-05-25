@@ -29,6 +29,7 @@ type CheckInState = {
   actionable: boolean;
   ticketCount: number;
   usedCount: number;
+  startTime?: number;
   startSummary: string;
   buttonLabel: string;
   buttonDanger: boolean;
@@ -64,7 +65,6 @@ function checkInStatus(item: CheckInEvent, now = new Date()): CheckInState {
       actionable: false,
       ticketCount: 0,
       usedCount: 0,
-      startTime: NaN,
       startSummary: '-',
       buttonLabel: '체크인 하기',
       buttonDanger: true,
@@ -231,7 +231,7 @@ export default function CheckInEventListPage({ navigation, route }: any) {
         <View style={styles.headerCopy}>
           <Text style={styles.eyebrow}>Check-in Events</Text>
           <Text style={styles.title}>{section}</Text>
-          <Text style={styles.subtitle}>체크인 운영 화면에서 선택한 섹션의 이벤트 목록입니다.</Text>
+          <Text style={styles.subtitle}>{section === '오늘 예정' ? '오늘 체크인 예정 이벤트를 확인합니다.' : section === '이후 일정' ? '예정된 체크인 이벤트를 확인합니다.' : '종료된 체크인 이벤트를 확인합니다.'}</Text>
         </View>
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <Text style={styles.backButtonText}>뒤로</Text>
@@ -243,37 +243,29 @@ export default function CheckInEventListPage({ navigation, route }: any) {
         keyExtractor={(entry) => entry.item.event.id}
         contentContainerStyle={styles.list}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); void load(); }} />}
-        ListHeaderComponent={(
-          <View style={styles.summaryCard}>
-            <View style={styles.summaryTop}>
-              <Text style={styles.summaryHint}>{filteredEvents.length}건</Text>
-            </View>
-            <Text style={styles.summaryText}>{section === '오늘 예정' ? '오늘 운영해야 할 체크인 이벤트를 확인합니다.' : section === '이후 일정' ? '예정된 체크인 이벤트를 확인합니다.' : '종료된 체크인 이벤트를 확인합니다.'}</Text>
-          </View>
-        )}
         renderItem={({ item }) => {
           const { item: event, status } = item;
           return (
-              <TouchableOpacity style={styles.card} onPress={() => navigation.navigate('OrganizerEventDetail', { eventId: event.event.id })}>
-                <View style={styles.cardHead}>
-                  <Text style={styles.category}>{status.label}</Text>
-                  <Text style={styles.salesBadge}>{status.label}</Text>
-                </View>
-                <Text style={styles.eventTitle}>{eventTitle(event.event)}</Text>
-                <Text style={styles.eventMeta}>{status.startSummary}</Text>
-                <Text style={styles.eventMeta}>입장 완료 {status.usedCount} / {status.ticketCount}</Text>
-                <View style={styles.actionRow}>
-                  <TouchableOpacity
-                    style={[styles.primaryButton]}
-                    onPress={() => navigation.navigate('CheckInManage', { eventId: event.event.id })}
-                  >
-                    <Text style={styles.primaryButtonText}>체크인 하기</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.secondaryButton} onPress={() => navigation.navigate('CheckInStatus', { eventId: event.event.id })}>
-                    <Text style={styles.secondaryButtonText}>체크인 현황</Text>
-                  </TouchableOpacity>
-                </View>
-              </TouchableOpacity>
+            <TouchableOpacity style={styles.card} onPress={() => navigation.navigate('OrganizerEventDetail', { eventId: event.event.id })}>
+              <View style={styles.cardHead}>
+                <Text style={styles.category}>{status.label}</Text>
+                <Text style={styles.salesBadge}>{status.label}</Text>
+              </View>
+              <Text style={styles.eventTitle}>{eventTitle(event.event)}</Text>
+              <Text style={styles.eventMeta}>{status.startSummary}</Text>
+              <Text style={styles.eventMeta}>입장 완료 {status.usedCount} / {status.ticketCount}</Text>
+              <View style={styles.actionRow}>
+                <TouchableOpacity
+                  style={[styles.primaryButton]}
+                  onPress={() => navigation.navigate('CheckInManage', { eventId: event.event.id })}
+                >
+                  <Text style={styles.primaryButtonText}>체크인 하기</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.secondaryButton} onPress={() => navigation.navigate('CheckInStatus', { eventId: event.event.id })}>
+                  <Text style={styles.secondaryButtonText}>체크인 현황</Text>
+                </TouchableOpacity>
+              </View>
+            </TouchableOpacity>
           );
         }}
         ListEmptyComponent={(
@@ -308,11 +300,6 @@ const styles = StyleSheet.create({
   backButton: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 10 },
   backButtonText: { color: '#0F172A', fontWeight: '900' },
   list: { padding: 18, paddingTop: 8, paddingBottom: 96 },
-  summaryCard: { backgroundColor: '#FFFFFF', borderRadius: 8, padding: 16, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 12 },
-  summaryTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  summaryTitle: { color: '#0F172A', fontSize: 17, fontWeight: '900' },
-  summaryHint: { color: '#64748B', fontSize: 12, fontWeight: '800' },
-  summaryText: { marginTop: 8, color: '#64748B', fontSize: 12, lineHeight: 18 },
   card: { backgroundColor: '#FFFFFF', borderRadius: 8, padding: 16, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 12 },
   cardHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
   category: { color: '#2563EB', fontSize: 12, fontWeight: '900' },
