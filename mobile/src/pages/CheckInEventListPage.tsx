@@ -54,6 +54,23 @@ function formatStartSummary(startTime: number, now = new Date()) {
 }
 
 function checkInStatus(item: CheckInEvent, now = new Date()): CheckInState {
+  // cancelled events should show cancelled label first
+  const eventStatus = String(item.event.status ?? '').toUpperCase();
+  if (eventStatus === 'CANCELLED') {
+    return {
+      label: '이벤트 취소',
+      rank: 0,
+      section: '종료된 이벤트',
+      actionable: false,
+      ticketCount: 0,
+      usedCount: 0,
+      startTime: NaN,
+      startSummary: '-',
+      buttonLabel: '체크인 하기',
+      buttonDanger: true,
+    };
+  }
+
   const ticketCount = item.event.totalTicketCount && item.event.totalTicketCount > 0 ? item.event.totalTicketCount : item.tickets.length;
   const usedCount = item.tickets.filter((ticket) => ticket.status === 'USED').length;
   const startTime = getNextRoundTime(item.event, now);
@@ -214,7 +231,7 @@ export default function CheckInEventListPage({ navigation, route }: any) {
         <View style={styles.headerCopy}>
           <Text style={styles.eyebrow}>Check-in Events</Text>
           <Text style={styles.title}>{section}</Text>
-          <Text style={styles.subtitle}>체크인 메인에서 선택한 상태의 이벤트 목록입니다.</Text>
+          <Text style={styles.subtitle}>체크인 운영 화면에서 선택한 섹션의 이벤트 목록입니다.</Text>
         </View>
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <Text style={styles.backButtonText}>뒤로</Text>
@@ -229,36 +246,34 @@ export default function CheckInEventListPage({ navigation, route }: any) {
         ListHeaderComponent={(
           <View style={styles.summaryCard}>
             <View style={styles.summaryTop}>
-              <Text style={styles.summaryTitle}>{section}</Text>
               <Text style={styles.summaryHint}>{filteredEvents.length}건</Text>
             </View>
-            <Text style={styles.summaryText}>{section === '오늘 예정' ? '오늘 운영해야 할 체크인 이벤트입니다.' : section === '이후 일정' ? '체크인 예정 이벤트를 확인합니다.' : '종료된 체크인 이벤트를 확인합니다.'}</Text>
+            <Text style={styles.summaryText}>{section === '오늘 예정' ? '오늘 운영해야 할 체크인 이벤트를 확인합니다.' : section === '이후 일정' ? '예정된 체크인 이벤트를 확인합니다.' : '종료된 체크인 이벤트를 확인합니다.'}</Text>
           </View>
         )}
         renderItem={({ item }) => {
           const { item: event, status } = item;
           return (
-            <TouchableOpacity style={styles.card} onPress={() => navigation.navigate('OrganizerEventDetail', { eventId: event.event.id })}>
-              <View style={styles.cardHead}>
-                <Text style={styles.category}>{status.label}</Text>
-                <Text style={styles.salesBadge}>{status.buttonDanger ? '체크인 불가' : '체크인 가능'}</Text>
-              </View>
-              <Text style={styles.eventTitle}>{eventTitle(event.event)}</Text>
-              <Text style={styles.eventMeta}>{status.startSummary}</Text>
-              <Text style={styles.eventMeta}>입장 완료 {status.usedCount} / {status.ticketCount}</Text>
-              <View style={styles.actionRow}>
-                <TouchableOpacity
-                  style={[styles.primaryButton, status.buttonDanger && styles.dangerButton, !status.actionable && styles.disabledButton]}
-                  disabled={!status.actionable}
-                  onPress={() => navigation.navigate('CheckInManage', { eventId: event.event.id })}
-                >
-                  <Text style={[styles.primaryButtonText, status.buttonDanger && styles.dangerButtonText]}>{status.buttonLabel}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.secondaryButton} onPress={() => navigation.navigate('CheckInStatus', { eventId: event.event.id })}>
-                  <Text style={styles.secondaryButtonText}>체크인 현황</Text>
-                </TouchableOpacity>
-              </View>
-            </TouchableOpacity>
+              <TouchableOpacity style={styles.card} onPress={() => navigation.navigate('OrganizerEventDetail', { eventId: event.event.id })}>
+                <View style={styles.cardHead}>
+                  <Text style={styles.category}>{status.label}</Text>
+                  <Text style={styles.salesBadge}>{status.label}</Text>
+                </View>
+                <Text style={styles.eventTitle}>{eventTitle(event.event)}</Text>
+                <Text style={styles.eventMeta}>{status.startSummary}</Text>
+                <Text style={styles.eventMeta}>입장 완료 {status.usedCount} / {status.ticketCount}</Text>
+                <View style={styles.actionRow}>
+                  <TouchableOpacity
+                    style={[styles.primaryButton]}
+                    onPress={() => navigation.navigate('CheckInManage', { eventId: event.event.id })}
+                  >
+                    <Text style={styles.primaryButtonText}>체크인 하기</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.secondaryButton} onPress={() => navigation.navigate('CheckInStatus', { eventId: event.event.id })}>
+                    <Text style={styles.secondaryButtonText}>체크인 현황</Text>
+                  </TouchableOpacity>
+                </View>
+              </TouchableOpacity>
           );
         }}
         ListEmptyComponent={(

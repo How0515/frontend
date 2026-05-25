@@ -12,7 +12,7 @@ const RESULT_FILTERS = [
   { value: 'ALL', label: '전체' },
   { value: 'SUCCESS', label: '입장 완료' },
   { value: 'FAILED', label: '입장 실패' },
-  { value: 'PENDING', label: '확인 필요' },
+  { value: 'PENDING', label: '수동 확인' },
 ] as const;
 const SORT_MODES = [
   { value: 'latest', label: '최신순' },
@@ -27,7 +27,7 @@ function resultLabel(record: CheckInRecord) {
   const value = String(record.result ?? record.status ?? '').toUpperCase();
   if (value === 'SUCCESS') return '입장 완료';
   if (value === 'FAILED') return '입장 실패';
-  return value || '확인 필요';
+  return value || '수동 확인';
 }
 
 export default function CheckInStatusPage({ route }: any) {
@@ -61,6 +61,11 @@ export default function CheckInStatusPage({ route }: any) {
 
   const used = tickets.filter((ticket) => ticket.status === 'USED').length;
   const success = records.filter((record) => record.result === 'SUCCESS' || record.status === 'SUCCESS').length;
+  const failure = records.filter((record) => String(record.result ?? record.status ?? '').toUpperCase() === 'FAILED').length;
+  const manualReview = records.filter((record) => {
+    const value = String(record.result ?? record.status ?? '').toUpperCase();
+    return value === 'PENDING' || !value;
+  }).length;
   const filteredRecords = useMemo(() => {
     const normalized = query.trim().toLowerCase();
     const base = records.filter((record) => {
@@ -109,27 +114,22 @@ export default function CheckInStatusPage({ route }: any) {
         <>
           <Text style={styles.eyebrow}>Check-in Status</Text>
           <Text style={styles.title}>체크인 현황</Text>
-          <Text style={styles.subtitle}>운영 상태, 결과 필터, 입장 처리 기록 순으로 확인합니다.</Text>
+          <Text style={styles.subtitle}>입장 처리 결과와 확인이 필요한 기록을 관리합니다.</Text>
           <View style={styles.metricGrid}>
-            <Metric label="체크인 완료" value={success} />
-            <Metric label="입장 실패" value={records.filter((record) => String(record.result ?? record.status ?? '').toUpperCase() === 'FAILED').length} />
-            <Metric label="확인 필요" value={records.filter((record) => {
-              const value = String(record.result ?? record.status ?? '').toUpperCase();
-              return value === 'PENDING' || !value;
-            }).length} />
+            <Metric label="입장 완료" value={success} />
+            <Metric label="입장 실패" value={failure} />
+            <Metric label="수동 확인" value={manualReview} />
           </View>
 
           <View style={styles.summaryCard}>
-            <View style={styles.sectionHead}>
-              <Text style={styles.sectionTitle}>운영 summary</Text>
-              <Text style={styles.pageText}>{records.length}건</Text>
-            </View>
-            <Text style={styles.summaryText}>체크인 완료, 입장 실패, 확인 필요 상태를 먼저 보고 기록으로 내려갑니다.</Text>
+            <Text style={styles.summaryText}>입장 처리 결과와 확인이 필요한 기록을 한 화면에서 관리합니다.</Text>
           </View>
 
-          <View style={styles.sectionHead}>
-            <Text style={styles.sectionTitle}>상태 filter</Text>
-            <Text style={styles.pageText}>{currentPage} / {totalPages}</Text>
+          <View style={styles.toolbarRow}>
+            <Text style={styles.pageText}>검색된 기록 {filteredRecords.length}건</Text>
+            <TouchableOpacity style={styles.sortButton} onPress={() => setShowSortOptions((value) => !value)}>
+              <Text style={styles.sortButtonText}>{SORT_MODES.find((item) => item.value === sortMode)?.label ?? '최신순'} ▼</Text>
+            </TouchableOpacity>
           </View>
           <TextInput
             style={styles.input}
@@ -155,9 +155,6 @@ export default function CheckInStatusPage({ route }: any) {
               </TouchableOpacity>
             ))}
           </ScrollView>
-          <TouchableOpacity style={styles.sortButton} onPress={() => setShowSortOptions((value) => !value)}>
-            <Text style={styles.sortButtonText}>{SORT_MODES.find((item) => item.value === sortMode)?.label ?? '최신순'} ▼</Text>
-          </TouchableOpacity>
           {showSortOptions ? (
             <View style={styles.sortSheet}>
               {SORT_MODES.map((item) => (
@@ -167,9 +164,9 @@ export default function CheckInStatusPage({ route }: any) {
               ))}
             </View>
           ) : null}
-          <View style={styles.sectionHead}>
-            <Text style={styles.sectionTitle}>입장 처리 기록 list</Text>
-            <Text style={styles.pageText}>검색된 기록 {filteredRecords.length}건</Text>
+          <View style={styles.listHead}>
+            <Text style={styles.listTitle}>입장 처리 기록</Text>
+            <Text style={styles.pageText}>{currentPage} / {totalPages}</Text>
           </View>
         </>
       }
@@ -222,9 +219,10 @@ const styles = StyleSheet.create({
   metricLabel: { color: '#64748B', fontSize: 12, fontWeight: '800' },
   metricValue: { marginTop: 8, color: '#0F172A', fontSize: 24, fontWeight: '900' },
   summaryCard: { marginTop: 16, backgroundColor: '#FFFFFF', borderRadius: 8, padding: 16, borderWidth: 1, borderColor: '#E2E8F0' },
-  summaryText: { marginTop: 8, color: '#64748B', fontSize: 12, lineHeight: 18 },
-  sectionHead: { marginTop: 18, marginBottom: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  sectionTitle: { color: '#0F172A', fontSize: 17, fontWeight: '900' },
+  summaryText: { color: '#64748B', fontSize: 12, lineHeight: 18 },
+  toolbarRow: { marginTop: 14, marginBottom: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
+  listHead: { marginTop: 16, marginBottom: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  listTitle: { color: '#0F172A', fontSize: 17, fontWeight: '900' },
   pageText: { color: '#64748B', fontSize: 12, fontWeight: '800' },
   input: { borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, padding: 12, backgroundColor: '#FFFFFF', color: '#0F172A' },
   filterList: { gap: 8, marginTop: 10, paddingBottom: 8 },
@@ -232,7 +230,7 @@ const styles = StyleSheet.create({
   activeFilterChip: { borderColor: '#2563EB', backgroundColor: '#EFF6FF' },
   filterChipText: { color: '#475569', fontWeight: '800', fontSize: 12 },
   activeFilterChipText: { color: '#2563EB' },
-  sortButton: { borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, paddingVertical: 11, alignItems: 'center', backgroundColor: '#FFFFFF', marginBottom: 10 },
+  sortButton: { minWidth: 118, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, paddingVertical: 11, paddingHorizontal: 12, alignItems: 'center', backgroundColor: '#FFFFFF' },
   sortButtonText: { color: '#2563EB', fontWeight: '900', fontSize: 13 },
   sortSheet: { marginBottom: 10, borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 8, backgroundColor: '#FFFFFF', overflow: 'hidden' },
   sortSheetItem: { paddingVertical: 12, paddingHorizontal: 14, borderTopWidth: 1, borderTopColor: '#E2E8F0' },
