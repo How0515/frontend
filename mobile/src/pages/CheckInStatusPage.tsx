@@ -82,6 +82,8 @@ export default function CheckInStatusPage({ route }: any) {
     });
   }, [query, records, selectedResult, sortMode]);
 
+  const hasActiveFilters = Boolean(query.trim()) || selectedResult !== 'ALL';
+
   const totalPages = Math.max(1, Math.ceil(filteredRecords.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
   const pagedRecords = useMemo(() => filteredRecords.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE), [currentPage, filteredRecords]);
@@ -107,13 +109,26 @@ export default function CheckInStatusPage({ route }: any) {
         <>
           <Text style={styles.eyebrow}>Check-in Status</Text>
           <Text style={styles.title}>체크인 현황</Text>
+          <Text style={styles.subtitle}>운영 상태, 결과 필터, 입장 처리 기록 순으로 확인합니다.</Text>
           <View style={styles.metricGrid}>
-            <Metric label="체크인 완료 티켓" value={used} />
-            <Metric label="입장 성공 기록" value={success} />
-            <Metric label="총 입장 처리 기록" value={records.length} />
+            <Metric label="체크인 완료" value={success} />
+            <Metric label="입장 실패" value={records.filter((record) => String(record.result ?? record.status ?? '').toUpperCase() === 'FAILED').length} />
+            <Metric label="확인 필요" value={records.filter((record) => {
+              const value = String(record.result ?? record.status ?? '').toUpperCase();
+              return value === 'PENDING' || !value;
+            }).length} />
           </View>
+
+          <View style={styles.summaryCard}>
+            <View style={styles.sectionHead}>
+              <Text style={styles.sectionTitle}>운영 summary</Text>
+              <Text style={styles.pageText}>{records.length}건</Text>
+            </View>
+            <Text style={styles.summaryText}>체크인 완료, 입장 실패, 확인 필요 상태를 먼저 보고 기록으로 내려갑니다.</Text>
+          </View>
+
           <View style={styles.sectionHead}>
-            <Text style={styles.sectionTitle}>입장 처리 기록</Text>
+            <Text style={styles.sectionTitle}>상태 filter</Text>
             <Text style={styles.pageText}>{currentPage} / {totalPages}</Text>
           </View>
           <TextInput
@@ -123,7 +138,7 @@ export default function CheckInStatusPage({ route }: any) {
               setQuery(value);
               setPage(1);
             }}
-            placeholder="티켓 ID, 메모 검색"
+            placeholder="티켓 ID 또는 좌석 검색"
             returnKeyType="search"
           />
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterList}>
@@ -140,20 +155,21 @@ export default function CheckInStatusPage({ route }: any) {
               </TouchableOpacity>
             ))}
           </ScrollView>
-          <TouchableOpacity style={styles.moreFilterButton} onPress={() => setShowSortOptions((value) => !value)}>
-            <Text style={styles.moreFilterText}>{showSortOptions ? '정렬 옵션 접기' : '정렬 옵션'}</Text>
+          <TouchableOpacity style={styles.sortButton} onPress={() => setShowSortOptions((value) => !value)}>
+            <Text style={styles.sortButtonText}>{SORT_MODES.find((item) => item.value === sortMode)?.label ?? '최신순'} ▼</Text>
           </TouchableOpacity>
           {showSortOptions ? (
-            <View style={styles.sortRow}>
+            <View style={styles.sortSheet}>
               {SORT_MODES.map((item) => (
-                <TouchableOpacity key={item.value} style={[styles.sortChip, sortMode === item.value && styles.activeSortChip]} onPress={() => { setSortMode(item.value); setPage(1); }}>
-                  <Text style={[styles.sortChipText, sortMode === item.value && styles.activeSortChipText]}>{item.label}</Text>
+                <TouchableOpacity key={item.value} style={[styles.sortSheetItem, sortMode === item.value && styles.activeSortSheetItem]} onPress={() => { setSortMode(item.value); setPage(1); setShowSortOptions(false); }}>
+                  <Text style={[styles.sortSheetItemText, sortMode === item.value && styles.activeSortSheetItemText]}>{item.label}</Text>
                 </TouchableOpacity>
               ))}
             </View>
           ) : null}
-          <View style={styles.pageHead}>
-            <Text style={styles.pageHint}>검색된 입장 처리 기록 {filteredRecords.length}건</Text>
+          <View style={styles.sectionHead}>
+            <Text style={styles.sectionTitle}>입장 처리 기록 list</Text>
+            <Text style={styles.pageText}>검색된 기록 {filteredRecords.length}건</Text>
           </View>
         </>
       }
@@ -164,7 +180,11 @@ export default function CheckInStatusPage({ route }: any) {
           {item.memo ? <Text style={styles.rowMemo}>{item.memo}</Text> : null}
         </View>
       )}
-      ListEmptyComponent={<Text style={styles.emptyText}>조건에 맞는 입장 처리 기록이 없습니다.</Text>}
+      ListEmptyComponent={(
+        <View style={styles.emptyWrap}>
+          <Text style={styles.emptyText}>{records.length === 0 && !hasActiveFilters ? '아직 입장 처리 기록이 없습니다.' : '검색 조건에 맞는 기록이 없습니다.'}</Text>
+        </View>
+      )}
       ListFooterComponent={
         filteredRecords.length > PAGE_SIZE ? (
           <View style={styles.pagination}>
@@ -196,39 +216,41 @@ const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F4F7FB' },
   eyebrow: { color: '#2563EB', fontWeight: '800', fontSize: 12 },
   title: { marginTop: 4, fontSize: 28, fontWeight: '900', color: '#0F172A' },
+  subtitle: { marginTop: 8, color: '#64748B', fontSize: 14, lineHeight: 21 },
   metricGrid: { flexDirection: 'row', gap: 8, marginTop: 16 },
-  metricCard: { flex: 1, backgroundColor: '#FFFFFF', borderRadius: 16, padding: 13, borderWidth: 1, borderColor: '#E2E8F0' },
+  metricCard: { flex: 1, backgroundColor: '#FFFFFF', borderRadius: 8, padding: 13, borderWidth: 1, borderColor: '#E2E8F0' },
   metricLabel: { color: '#64748B', fontSize: 12, fontWeight: '800' },
   metricValue: { marginTop: 8, color: '#0F172A', fontSize: 24, fontWeight: '900' },
+  summaryCard: { marginTop: 16, backgroundColor: '#FFFFFF', borderRadius: 8, padding: 16, borderWidth: 1, borderColor: '#E2E8F0' },
+  summaryText: { marginTop: 8, color: '#64748B', fontSize: 12, lineHeight: 18 },
   sectionHead: { marginTop: 18, marginBottom: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   sectionTitle: { color: '#0F172A', fontSize: 17, fontWeight: '900' },
   pageText: { color: '#64748B', fontSize: 12, fontWeight: '800' },
-  input: { borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 12, padding: 12, backgroundColor: '#FFFFFF', color: '#0F172A' },
+  input: { borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, padding: 12, backgroundColor: '#FFFFFF', color: '#0F172A' },
   filterList: { gap: 8, marginTop: 10, paddingBottom: 8 },
   filterChip: { borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: '#FFFFFF' },
   activeFilterChip: { borderColor: '#2563EB', backgroundColor: '#EFF6FF' },
   filterChipText: { color: '#475569', fontWeight: '800', fontSize: 12 },
   activeFilterChipText: { color: '#2563EB' },
-  moreFilterButton: { borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 12, paddingVertical: 10, alignItems: 'center', backgroundColor: '#FFFFFF', marginBottom: 10 },
-  moreFilterText: { color: '#2563EB', fontWeight: '900', fontSize: 12 },
-  sortRow: { flexDirection: 'row', gap: 8, marginTop: 2, marginBottom: 10 },
-  sortChip: { flex: 1, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 12, paddingVertical: 10, alignItems: 'center', backgroundColor: '#FFFFFF' },
-  activeSortChip: { borderColor: '#2563EB', backgroundColor: '#EFF6FF' },
-  sortChipText: { color: '#475569', fontWeight: '900' },
-  activeSortChipText: { color: '#2563EB' },
-  pageHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  pageHint: { color: '#64748B', fontSize: 12, fontWeight: '800' },
-  row: { backgroundColor: '#FFFFFF', borderRadius: 14, padding: 14, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 10 },
+  sortButton: { borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, paddingVertical: 11, alignItems: 'center', backgroundColor: '#FFFFFF', marginBottom: 10 },
+  sortButtonText: { color: '#2563EB', fontWeight: '900', fontSize: 13 },
+  sortSheet: { marginBottom: 10, borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 8, backgroundColor: '#FFFFFF', overflow: 'hidden' },
+  sortSheetItem: { paddingVertical: 12, paddingHorizontal: 14, borderTopWidth: 1, borderTopColor: '#E2E8F0' },
+  activeSortSheetItem: { backgroundColor: '#EFF6FF' },
+  sortSheetItemText: { color: '#475569', fontWeight: '900' },
+  activeSortSheetItemText: { color: '#2563EB' },
+  row: { backgroundColor: '#FFFFFF', borderRadius: 8, padding: 16, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 10 },
   rowTitle: { color: '#0F172A', fontWeight: '900' },
   rowMeta: { marginTop: 4, color: '#64748B', fontSize: 12 },
   rowMemo: { marginTop: 8, color: '#334155', fontSize: 13, lineHeight: 18 },
   pagination: { flexDirection: 'row', gap: 8, marginTop: 4, alignItems: 'center', justifyContent: 'center' },
-  pageButton: { flex: 1, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 12, paddingVertical: 12, alignItems: 'center', backgroundColor: '#FFFFFF' },
+  pageButton: { flex: 1, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, paddingVertical: 12, alignItems: 'center', backgroundColor: '#FFFFFF' },
   pageButtonText: { color: '#0F172A', fontWeight: '900' },
-  pageNumberButton: { minWidth: 36, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 10, paddingVertical: 9, paddingHorizontal: 8, alignItems: 'center', backgroundColor: '#FFFFFF' },
+  pageNumberButton: { minWidth: 36, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, paddingVertical: 9, paddingHorizontal: 8, alignItems: 'center', backgroundColor: '#FFFFFF' },
   activePageNumberButton: { borderColor: '#2563EB', backgroundColor: '#2563EB' },
   pageNumberText: { color: '#475569', fontWeight: '900', fontSize: 12 },
   activePageNumberText: { color: '#FFFFFF' },
   disabledButton: { opacity: 0.55 },
-  emptyText: { color: '#94A3B8', paddingVertical: 48, textAlign: 'center' },
+  emptyWrap: { paddingVertical: 48 },
+  emptyText: { color: '#94A3B8', textAlign: 'center' },
 });
