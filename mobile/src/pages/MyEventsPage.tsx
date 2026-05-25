@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { errorMessage } from '../lib/account';
 import { backendApi } from '../lib/backend';
-import { formatEventRange, getEventDisplayStatus } from '../lib/ticketDisplay';
+import { eventDisplaySortRank, formatCompactEventRange, formatEventCategory, getEventDisplayStatus } from '../lib/ticketDisplay';
 import type { EventSummary } from '../types/api';
 
 const PAGE_SIZE = 8;
@@ -24,14 +24,8 @@ function eventTitle(event: EventSummary) {
 }
 
 function categoryLabel(category?: string) {
-  const labels: Record<string, string> = {
-    CONCERT: '공연',
-    SPORTS: '스포츠',
-    EXHIBITION: '전시',
-    FESTIVAL: '페스티벌',
-    ETC: '기타',
-  };
-  return labels[String(category ?? '').toUpperCase()] ?? category ?? '-';
+  const label = formatEventCategory(category);
+  return label === '페스티벌' ? '기타' : label;
 }
 
 function eventStart(event: EventSummary) {
@@ -80,6 +74,8 @@ export default function MyEventsPage({ navigation }: any) {
         return !normalized || haystack.includes(normalized);
       })
       .sort((a, b) => {
+        const rankDiff = eventDisplaySortRank(a) - eventDisplaySortRank(b);
+        if (rankDiff !== 0) return rankDiff;
         const aTime = new Date(eventStart(a)).getTime();
         const bTime = new Date(eventStart(b)).getTime();
         return (Number.isNaN(aTime) ? Number.MAX_SAFE_INTEGER : aTime) - (Number.isNaN(bTime) ? Number.MAX_SAFE_INTEGER : bTime);
@@ -145,7 +141,7 @@ export default function MyEventsPage({ navigation }: any) {
             </View>
             <Text style={styles.eventTitle}>{eventTitle(item)}</Text>
             <Text style={styles.eventMeta}>장소 {item.venue || '-'}</Text>
-            <Text style={styles.eventMeta}>이벤트 기간 {formatEventRange(eventStart(item), eventEnd(item))}</Text>
+            <Text style={styles.eventMeta}>{formatCompactEventRange(eventStart(item), eventEnd(item))}</Text>
           </TouchableOpacity>
         )}
         ListEmptyComponent={(
@@ -190,7 +186,7 @@ const styles = StyleSheet.create({
   card: { backgroundColor: '#FFFFFF', borderRadius: 8, padding: 16, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 12 },
   cardHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
   category: { color: '#2563EB', fontSize: 12, fontWeight: '900' },
-  salesBadge: { overflow: 'hidden', borderRadius: 999, backgroundColor: '#E0F2FE', color: '#0369A1', paddingHorizontal: 9, paddingVertical: 5, fontSize: 11, fontWeight: '900' },
+  salesBadge: { overflow: 'hidden', borderRadius: 999, backgroundColor: '#E0F2FE', color: '#0369A1', paddingHorizontal: 9, paddingVertical: 5, minWidth: 62, textAlign: 'center', fontSize: 11, fontWeight: '900' },
   eventTitle: { fontSize: 17, fontWeight: '900', color: '#0F172A', marginBottom: 8 },
   eventMeta: { marginTop: 4, color: '#64748B', fontSize: 12, lineHeight: 18 },
   empty: { alignItems: 'center', paddingVertical: 80 },

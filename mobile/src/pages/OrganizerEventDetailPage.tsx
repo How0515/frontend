@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   ActivityIndicator,
@@ -13,12 +13,8 @@ import {
 } from 'react-native';
 import { errorMessage } from '../lib/account';
 import { backendApi } from '../lib/backend';
-import { formatEventRange, formatEventStatus, getEventDisplayStatus, getTicketDisplayStatus, weiToEth } from '../lib/ticketDisplay';
+import { formatEventRange, formatEventStatus, getEventDisplayStatus } from '../lib/ticketDisplay';
 import type { EventDetail, TicketDetail } from '../types/api';
-
-function ticketId(ticket: TicketDetail) {
-  return String(ticket.id ?? ticket.ticketId ?? ticket.seatInfo);
-}
 
 function eventTitle(event: EventDetail) {
   return event.name || event.title || '이벤트';
@@ -53,10 +49,6 @@ export default function OrganizerEventDetailPage({ navigation, route }: any) {
   const usedTickets = tickets.filter((ticket) => String(ticket.status).toUpperCase() === 'USED').length;
   const totalTickets = event?.totalTicketCount && event.totalTicketCount > 0 ? event.totalTicketCount : tickets.length;
   const displayStatus = getEventDisplayStatus(event);
-  const recentTickets = useMemo(
-    () => [...tickets].sort((a, b) => new Date(b.createdAt || '').getTime() - new Date(a.createdAt || '').getTime()).slice(0, 4),
-    [tickets],
-  );
 
   const load = useCallback(async () => {
     if (!eventId) {
@@ -154,7 +146,7 @@ export default function OrganizerEventDetailPage({ navigation, route }: any) {
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>주요 액션</Text>
+        <Text style={styles.cardTitle}>티켓 운영</Text>
         <View style={styles.actionList}>
           <TouchableOpacity style={styles.primaryButton} onPress={() => navigation.navigate('TicketIssue', { eventId: event.id, returnTo: 'detail' })}>
             <Text style={styles.primaryButtonText}>티켓 발행</Text>
@@ -169,7 +161,7 @@ export default function OrganizerEventDetailPage({ navigation, route }: any) {
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>보조 액션</Text>
+        <Text style={styles.cardTitle}>이벤트 관리</Text>
         <View style={styles.actionList}>
           <TouchableOpacity style={styles.secondaryButton} onPress={() => navigation.navigate('EventSettings', { eventId: event.id })}>
             <Text style={styles.secondaryButtonText}>이벤트 수정</Text>
@@ -201,32 +193,6 @@ export default function OrganizerEventDetailPage({ navigation, route }: any) {
           </TouchableOpacity>
         </View>
       </View>
-
-      <View style={styles.cardSecondary}>
-        <View style={styles.sectionHead}>
-          <Text style={styles.cardTitle}>최근 발행 티켓</Text>
-          <TouchableOpacity onPress={() => navigation.navigate('TicketExplore', { eventId: event.id })}>
-            <Text style={styles.linkText}>전체 보기</Text>
-          </TouchableOpacity>
-        </View>
-        {recentTickets.length === 0 ? (
-          <Text style={styles.emptyText}>최근 발행 티켓이 없습니다.</Text>
-        ) : (
-          recentTickets.map((ticket) => {
-            const ticketStatus = getTicketDisplayStatus(ticket);
-            return (
-              <View key={ticketId(ticket)} style={styles.ticketRow}>
-                <View style={styles.ticketInfo}>
-                  <Text style={styles.ticketTitle}>{ticket.seatInfo || '-'}</Text>
-                  <Text style={styles.ticketMeta}>구역 {ticket.sectionName || String(ticket.seatInfo || '').split('-')[0]} · 가격 {weiToEth(ticket.originalPriceWei || ticket.priceWei)}</Text>
-                  <Text style={styles.ticketMeta}>리셀 {ticket.resaleEnabled ? '허용' : '불가'} · {ticket.ownerWalletAddress || ticket.ownerAddress || '미판매'}</Text>
-                </View>
-                <Text style={[styles.ticketBadge, styles[`tone_${ticketStatus.tone}`]]}>{ticketStatus.label}</Text>
-              </View>
-            );
-          })
-        )}
-      </View>
     </ScrollView>
   );
 }
@@ -256,13 +222,12 @@ const styles = StyleSheet.create({
   title: { fontSize: 24, fontWeight: '900', color: '#0F172A', lineHeight: 31 },
   meta: { marginTop: 7, color: '#64748B', fontSize: 13, lineHeight: 19 },
   statusText: { marginTop: 10, color: '#334155', fontSize: 12, fontWeight: '900' },
-  statusBadge: { overflow: 'hidden', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5, fontSize: 11, fontWeight: '900' },
+  statusBadge: { overflow: 'hidden', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5, minWidth: 62, textAlign: 'center', fontSize: 11, fontWeight: '900' },
   metricGrid: { flexDirection: 'row', gap: 8, marginTop: 14 },
   metricCard: { flex: 1, backgroundColor: '#FFFFFF', borderRadius: 8, padding: 12, borderWidth: 1, borderColor: '#E2E8F0' },
   metricLabel: { color: '#64748B', fontSize: 11, fontWeight: '800' },
   metricValue: { marginTop: 7, color: '#0F172A', fontSize: 22, fontWeight: '900' },
   card: { marginTop: 14, backgroundColor: '#FFFFFF', borderRadius: 12, padding: 15, borderWidth: 1, borderColor: '#E2E8F0' },
-  cardSecondary: { marginTop: 14, backgroundColor: '#FFFFFF', borderRadius: 12, padding: 15, borderWidth: 1, borderColor: '#EEF2F7' },
   cardTitle: { color: '#0F172A', fontSize: 17, fontWeight: '900' },
   subTitle: { color: '#0F172A', fontSize: 15, fontWeight: '900' },
   actionList: { marginTop: 12, gap: 8 },
@@ -281,14 +246,6 @@ const styles = StyleSheet.create({
   statusSaveButton: { marginTop: 10, borderWidth: 1, borderColor: '#2563EB', borderRadius: 10, paddingVertical: 12, alignItems: 'center', backgroundColor: '#EFF6FF' },
   statusSaveButtonText: { color: '#2563EB', fontSize: 14, fontWeight: '900' },
   disabledButton: { opacity: 0.55 },
-  sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
-  linkText: { color: '#2563EB', fontSize: 12, fontWeight: '900' },
-  ticketRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, borderTopWidth: 1, borderTopColor: '#F1F5F9' },
-  ticketInfo: { flex: 1, paddingRight: 10 },
-  ticketTitle: { color: '#0F172A', fontWeight: '900' },
-  ticketMeta: { marginTop: 4, color: '#64748B', fontSize: 12 },
-  ticketBadge: { overflow: 'hidden', borderRadius: 999, paddingHorizontal: 9, paddingVertical: 5, fontSize: 11, fontWeight: '900' },
-  emptyText: { color: '#94A3B8', paddingVertical: 16, textAlign: 'center' },
   tone_neutral: { backgroundColor: '#F1F5F9', color: '#475569' },
   tone_blue: { backgroundColor: '#DBEAFE', color: '#1D4ED8' },
   tone_green: { backgroundColor: '#DCFCE7', color: '#15803D' },

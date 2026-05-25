@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { accountStatusMessage, errorMessage } from '../lib/account';
 import { backendApi } from '../lib/backend';
-import { formatEventRange, getEventDisplayStatus } from '../lib/ticketDisplay';
+import { eventDisplaySortRank, formatCompactEventRange, formatEventCategory, getEventDisplayStatus } from '../lib/ticketDisplay';
 import type { EventSummary, OrganizerApplication, UserProfile } from '../types/api';
 
 function eventTitle(event: EventSummary) {
@@ -29,17 +29,17 @@ function eventEnd(event: EventSummary) {
 }
 
 function categoryLabel(category?: string) {
-  const labels: Record<string, string> = { CONCERT: '공연', SPORTS: '스포츠', EXHIBITION: '전시', FESTIVAL: '페스티벌', ETC: '기타' };
-  return labels[String(category ?? '').toUpperCase()] ?? category ?? '-';
+  const label = formatEventCategory(category);
+  return label === '페스티벌' ? '기타' : label;
 }
 
-function sortCanceledLast(events: EventSummary[]) {
+function sortEventsForOperation(events: EventSummary[]) {
   return [...events].sort((a, b) => {
-    if (a.status === 'CANCELLED' && b.status !== 'CANCELLED') return 1;
-    if (a.status !== 'CANCELLED' && b.status === 'CANCELLED') return -1;
+    const rankDiff = eventDisplaySortRank(a) - eventDisplaySortRank(b);
+    if (rankDiff !== 0) return rankDiff;
     const aTime = new Date(a.eventAt || a.eventDateTime || '').getTime();
     const bTime = new Date(b.eventAt || b.eventDateTime || '').getTime();
-    return (Number.isNaN(bTime) ? 0 : bTime) - (Number.isNaN(aTime) ? 0 : aTime);
+    return (Number.isNaN(aTime) ? Number.MAX_SAFE_INTEGER : aTime) - (Number.isNaN(bTime) ? Number.MAX_SAFE_INTEGER : bTime);
   });
 }
 
@@ -91,7 +91,7 @@ export default function OrganizerDashboardPage({ navigation }: any) {
 
       if (me.roles?.includes('ORGANIZER') || me.roles?.includes('ADMIN')) {
         const eventPage = await backendApi.getMyEvents({ page: 0, size: 5 });
-        const myEvents = sortCanceledLast(eventPage.items ?? []);
+        const myEvents = sortEventsForOperation(eventPage.items ?? []);
         setEvents(myEvents);
 
         const ticketLists = await Promise.all(
@@ -274,8 +274,7 @@ export default function OrganizerDashboardPage({ navigation }: any) {
                     <Text style={styles.eventCategory}>{categoryLabel(event.category)}</Text>
                     <Text style={styles.eventTitle}>{eventTitle(event)}</Text>
                     <Text style={styles.eventMeta}>장소 {event.venue || '-'}</Text>
-                    <Text style={styles.eventMeta}>이벤트 기간 {formatEventRange(eventStart(event), eventEnd(event))}</Text>
-                    <Text style={styles.eventMeta}>판매 기간 {formatEventRange(event.salesStartAt || event.primarySaleStart, event.salesEndAt || event.primarySaleEnd)}</Text>
+                    <Text style={styles.eventMeta}>{formatCompactEventRange(eventStart(event), eventEnd(event))}</Text>
                   </View>
                   <Text style={styles.badge}>{getEventDisplayStatus(event).label}</Text>
                 </TouchableOpacity>
@@ -337,5 +336,5 @@ const styles = StyleSheet.create({
   eventCategory: { color: '#2563EB', fontSize: 11, fontWeight: '900', marginBottom: 4 },
   eventTitle: { color: '#0F172A', fontSize: 15, fontWeight: '900' },
   eventMeta: { marginTop: 4, color: '#64748B', fontSize: 12 },
-  badge: { overflow: 'hidden', borderRadius: 999, backgroundColor: '#E0F2FE', color: '#0369A1', paddingHorizontal: 9, paddingVertical: 5, fontSize: 11, fontWeight: '900' },
+  badge: { overflow: 'hidden', borderRadius: 999, backgroundColor: '#E0F2FE', color: '#0369A1', paddingHorizontal: 9, paddingVertical: 5, minWidth: 62, textAlign: 'center', fontSize: 11, fontWeight: '900' },
 });

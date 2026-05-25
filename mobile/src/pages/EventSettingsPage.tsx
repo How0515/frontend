@@ -374,7 +374,6 @@ export default function EventSettingsPage({ navigation, route }: any) {
         <Text style={styles.subtitle}>이벤트 정보를 수정한 후 티켓과 좌석 설정을 이어서 관리할 수 있습니다.</Text>
 
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>기본 정보</Text>
           <Text style={styles.label}>카테고리</Text>
           <View style={styles.categoryGrid}>
             {EVENT_CATEGORIES.map((item) => (

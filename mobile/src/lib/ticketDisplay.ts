@@ -95,6 +95,51 @@ export function formatEventRange(start?: string | null, end?: string | null) {
   return `${startText} ~ ${endText}`;
 }
 
+export function formatCompactDateTime(value?: string | null) {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  const pad = (next: number) => String(next).padStart(2, '0');
+  return `${date.getFullYear()}.${pad(date.getMonth() + 1)}.${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+export function formatCompactEventRange(start?: string | null, end?: string | null) {
+  const startText = formatCompactDateTime(start);
+  const endText = formatCompactDateTime(end);
+  if (startText === '-' && endText === '-') return '-';
+  if (startText === endText || endText === '-') return startText;
+  if (start && end) {
+    const startDate = new Date(start);
+    const endDate = new Date(end);
+    if (!Number.isNaN(startDate.getTime()) && !Number.isNaN(endDate.getTime())) {
+      const sameDay =
+        startDate.getFullYear() === endDate.getFullYear() &&
+        startDate.getMonth() === endDate.getMonth() &&
+        startDate.getDate() === endDate.getDate();
+      if (sameDay) {
+        const pad = (next: number) => String(next).padStart(2, '0');
+        return `${startText} ~ ${pad(endDate.getHours())}:${pad(endDate.getMinutes())}`;
+      }
+    }
+  }
+  return `${startText} ~ ${endText}`;
+}
+
+export function formatEventCategory(category?: string | null) {
+  const labels: Record<string, string> = {
+    CONCERT: '공연',
+    PERFORMANCE: '공연',
+    SHOW: '공연',
+    EXHIBITION: '전시',
+    SPORTS: '스포츠',
+    FESTIVAL: '페스티벌',
+    ETC: '기타',
+    OTHER: '기타',
+  };
+  const key = normalized(category);
+  return labels[key] ?? category ?? '기타';
+}
+
 export function formatEventStatus(status?: string | null) {
   const key = normalized(status);
   return EVENT_STATUS_LABEL[key] ?? status ?? '-';
@@ -161,6 +206,25 @@ export function getTicketDisplayStatus(ticket?: TicketDetail | null): DisplaySta
   if (status === 'SOLD') return { label: '입장 가능', tone: 'green' };
   if (status === 'AVAILABLE') return { label: '판매 가능', tone: 'blue' };
   return { label: formatTicketStatus(ticket.status), tone: 'neutral' };
+}
+
+export function eventDisplaySortRank(event?: EventSummary | null, now = new Date()) {
+  const status = getEventDisplayStatus(event, now).label;
+  const ranks: Record<string, number> = {
+    '공연 중': 0,
+    '판매 중': 1,
+    '판매 예정': 2,
+    '매진': 3,
+    종료: 5,
+    취소: 6,
+  };
+  if (status === '종료') {
+    const end = event?.eventEndAt || event?.endsAt || event?.eventAt || event?.eventDateTime;
+    const endTime = timeOf(end);
+    const soonThreshold = now.getTime() - 7 * 24 * 60 * 60 * 1000;
+    if (!Number.isNaN(endTime) && endTime >= soonThreshold) return 4;
+  }
+  return ranks[status] ?? 2;
 }
 
 export function weiToEth(wei?: string | number | null) {
