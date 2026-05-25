@@ -3,6 +3,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import {
   ActivityIndicator,
   Alert,
+  Modal,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -18,7 +19,8 @@ import type { EventDetail, EventRound, TicketDetail } from '../types/api';
 
 const SECTION_PRESETS = ['VIP', 'R', 'S', 'A', 'B', 'C', '스탠딩'];
 const RESALE_RATE_PRESETS = ['100', '110', '120', '150'];
-const QUANTITY_PRESETS = ['1', '10', '50'];
+const HOUR_OPTIONS = Array.from({ length: 24 }, (_, index) => pad(index));
+const MINUTE_OPTIONS = Array.from({ length: 12 }, (_, index) => pad(index * 5));
 
 type FlowPage = 1 | 2 | 3;
 type PolicyMode = 'global' | 'round';
@@ -299,12 +301,6 @@ export default function TicketIssuePage({ navigation, route }: any) {
     }));
   };
 
-  const setAllRemainingQuantity = () => {
-    if (currentTotalTicketCount <= 0) return;
-    const saved = currentSections.reduce((sum, section) => sum + (Number(section.quantity) || 0), 0);
-    updateDraft({ quantity: String(Math.max(currentTotalTicketCount - saved, 0)) });
-  };
-
   const validateCapacityPage = () => {
     if (!policyMode) {
       showError('정책 적용 방식을 먼저 선택해주세요.');
@@ -401,6 +397,15 @@ export default function TicketIssuePage({ navigation, route }: any) {
     }));
   };
 
+  const editSavedPolicy = (policy: SectionPolicy) => {
+    setDrafts((current) => ({
+      ...current,
+      [draftKey]: { ...policy, id: makeId('section'), expanded: false },
+    }));
+    removeSavedPolicy(policy.id);
+    setFeedback({ type: 'success', message: `${sectionNameOf(policy)} 정책을 수정할 수 있도록 펼쳤습니다.` });
+  };
+
   const sectionToPayload = (policy: SectionPolicy, round: EventRound, roundIndex: number): IssueSectionPayload => {
     const rawSection = sectionNameOf(policy);
     return {
@@ -449,17 +454,21 @@ export default function TicketIssuePage({ navigation, route }: any) {
     }
   };
 
-  const previewRange = (policy: SectionPolicy, roundIndex: number) => {
-    const section = sectionNameOf(policy) || '구역';
+  const seatRange = (policy: SectionPolicy) => {
+    const section = sectionNameOf(policy) || '좌석';
     const start = Number(policy.startNumber || '1');
     const quantity = Number(policy.quantity || '0');
     const end = quantity > 0 ? start + quantity - 1 : start;
-    return `${roundIndex + 1}회차-${section}-${start} ~ ${section}-${end}`;
+    return quantity === 1 ? `${section}-${start}` : `${section}-${start} ~ ${section}-${end}`;
   };
 
-  const savedPolicySummary = (policy: SectionPolicy) => (
-    `${sectionNameOf(policy)} · ${policy.quantity}장 · ${policy.priceEth}ETH · 판매 ${formatDateShort(policy.saleStartDate)}~${formatDateShort(policy.saleEndDate)} · ${policy.resaleEnabled ? `리셀 ${resaleRateOf(policy)}%` : '리셀 불가'}`
-  );
+  const previewRange = (policy: SectionPolicy, roundIndex: number) => {
+    return `${roundIndex + 1}회차-${seatRange(policy)}`;
+  };
+
+  const savedPolicyTitle = (policy: SectionPolicy) => `${sectionNameOf(policy)} · ${policy.quantity}장 · ${policy.priceEth} ETH`;
+  const savedPolicySaleSummary = (policy: SectionPolicy) => `판매 ${formatDateDot(policy.saleStartDate)} ${policy.saleStartTime} ~ ${formatDateDot(policy.saleEndDate)} ${policy.saleEndTime}`;
+  const savedPolicyResaleSummary = (policy: SectionPolicy) => policy.resaleEnabled ? `리셀 허용 · 최대 ${resaleRateOf(policy)}%` : '리셀 불가';
 
   const pageTitle = flowPage === 1
     ? '적용 방식 선택'
@@ -597,13 +606,20 @@ export default function TicketIssuePage({ navigation, route }: any) {
                   {currentSections.map((policy) => (
                     <View key={policy.id} style={styles.savedPolicyCard}>
                       <TouchableOpacity style={styles.savedPolicyHeader} onPress={() => toggleSavedPolicy(policy.id)}>
-                        <Text style={styles.savedPolicyText}>{policy.expanded ? '▼' : '▶'} {savedPolicySummary(policy)}</Text>
+                        <View style={styles.savedPolicyHeaderTop}>
+                          <Text style={styles.savedBadge}>✓ 저장됨</Text>
+                          <Text style={styles.savedPolicyArrow}>{policy.expanded ? '▼' : '▶'}</Text>
+                        </View>
+                        <Text style={styles.savedPolicyText}>{savedPolicyTitle(policy)}</Text>
+                        <Text style={styles.savedPolicyMeta}>{savedPolicySaleSummary(policy)}</Text>
+                        <Text style={styles.savedPolicyMeta}>{savedPolicyResaleSummary(policy)}</Text>
                       </TouchableOpacity>
                       {policy.expanded ? (
                         <View style={styles.savedPolicyDetail}>
-                          <Text style={styles.previewText}>판매 시작 {formatDateDot(policy.saleStartDate)} {policy.saleStartTime}</Text>
-                          <Text style={styles.previewText}>판매 종료 {formatDateDot(policy.saleEndDate)} {policy.saleEndTime}</Text>
                           <Text style={styles.previewText}>발행 예정 {previewRange(policy, activeRoundIndex)}</Text>
+                          <TouchableOpacity style={styles.editButton} onPress={() => editSavedPolicy(policy)}>
+                            <Text style={styles.editButtonText}>수정</Text>
+                          </TouchableOpacity>
                           <TouchableOpacity style={styles.removeButton} onPress={() => removeSavedPolicy(policy.id)}>
                             <Text style={styles.removeButtonText}>삭제</Text>
                           </TouchableOpacity>
@@ -615,7 +631,9 @@ export default function TicketIssuePage({ navigation, route }: any) {
               ) : null}
 
               <View style={styles.builderBox}>
+                <View style={styles.stepCard}>
                 <Text style={styles.builderTitle}>STEP 1 · 좌석 구역 선택</Text>
+                <Text style={styles.helpText}>좌석 구역을 선택해 판매 정보를 설정하세요.</Text>
                 <View style={styles.chipGrid}>
                   {SECTION_PRESETS.map((section) => (
                     <TouchableOpacity
@@ -639,33 +657,24 @@ export default function TicketIssuePage({ navigation, route }: any) {
                     autoCapitalize="characters"
                   />
                 ) : null}
+                </View>
 
                 {canRevealQuantity ? (
-                  <View style={styles.stepBox}>
-                    <Text style={styles.builderTitle}>STEP 2 · 발행 개수 설정</Text>
+                  <View style={[styles.stepCard, styles.activeStepCard]}>
+                    <Text style={styles.builderTitle}>STEP 2 · {sectionNameOf(currentDraft)} 좌석 발행 수량 설정</Text>
                     <View style={styles.unitInputWrap}>
                       <TextInput style={styles.unitInput} value={currentDraft.quantity} onChangeText={(value) => updateDraft({ quantity: value })} keyboardType="number-pad" inputMode="numeric" placeholder="10" />
                       <Text style={styles.unitText}>장</Text>
                     </View>
-                    <View style={styles.quickRow}>
-                      {QUANTITY_PRESETS.map((quantity) => (
-                        <TouchableOpacity key={quantity} style={styles.quickButton} onPress={() => updateDraft({ quantity })}>
-                          <Text style={styles.quickButtonText}>{quantity}장</Text>
-                        </TouchableOpacity>
-                      ))}
-                      <TouchableOpacity style={[styles.quickButton, currentTotalTicketCount <= 0 && styles.disabledButton]} disabled={currentTotalTicketCount <= 0} onPress={setAllRemainingQuantity}>
-                        <Text style={styles.quickButtonText}>남은 수량 전체</Text>
-                      </TouchableOpacity>
-                    </View>
                     <View style={styles.issuePreviewBox}>
-                      <Text style={styles.previewLabel}>발행 예정 좌석</Text>
-                      <Text style={styles.previewText}>{previewRange(currentDraft, activeRoundIndex)}</Text>
+                      <Text style={styles.previewLabel}>발행 예정</Text>
+                      <Text style={styles.previewTextStrong}>{seatRange(currentDraft)}</Text>
                     </View>
                   </View>
                 ) : null}
 
                 {canRevealPrice ? (
-                  <View style={styles.stepBox}>
+                  <View style={[styles.stepCard, styles.formStepCard]}>
                     <Text style={styles.builderTitle}>STEP 3 · 가격 및 판매 기간 설정</Text>
                     <Text style={styles.label}>가격</Text>
                     <View style={styles.unitInputWrap}>
@@ -673,17 +682,17 @@ export default function TicketIssuePage({ navigation, route }: any) {
                       <Text style={styles.unitText}>ETH</Text>
                     </View>
                     <View style={styles.dateTimeGrid}>
-                      <DateTimeField label="판매 시작 날짜" value={currentDraft.saleStartDate} onChange={(value) => updateDraft({ saleStartDate: value })} placeholder="YYYY-MM-DD" />
-                      <DateTimeField label="시작 시간" value={currentDraft.saleStartTime} onChange={(value) => updateDraft({ saleStartTime: value })} placeholder="HH:mm" />
-                      <DateTimeField label="판매 종료 날짜" value={currentDraft.saleEndDate} onChange={(value) => updateDraft({ saleEndDate: value })} placeholder="YYYY-MM-DD" />
-                      <DateTimeField label="종료 시간" value={currentDraft.saleEndTime} onChange={(value) => updateDraft({ saleEndTime: value })} placeholder="HH:mm" />
+                      <DatePickerField label="판매 시작 날짜" value={currentDraft.saleStartDate} onChange={(value) => updateDraft({ saleStartDate: value })} />
+                      <TimePickerField label="시작 시간" value={currentDraft.saleStartTime} onChange={(value) => updateDraft({ saleStartTime: value })} />
+                      <DatePickerField label="판매 종료 날짜" value={currentDraft.saleEndDate} onChange={(value) => updateDraft({ saleEndDate: value })} />
+                      <TimePickerField label="종료 시간" value={currentDraft.saleEndTime} onChange={(value) => updateDraft({ saleEndTime: value })} />
                     </View>
                     <Text style={styles.helpText}>판매 종료는 선택된 회차의 공연 시작 전까지만 허용됩니다.</Text>
                   </View>
                 ) : null}
 
                 {canRevealResale ? (
-                  <View style={styles.stepBox}>
+                  <View style={[styles.stepCard, styles.formStepCard]}>
                     <Text style={styles.builderTitle}>STEP 4 · 리셀 정책 설정</Text>
                     <TouchableOpacity style={styles.toggleRow} onPress={() => updateDraft({ resaleEnabled: !currentDraft.resaleEnabled })}>
                       <Text style={styles.toggleLabel}>리셀 허용</Text>
@@ -718,16 +727,20 @@ export default function TicketIssuePage({ navigation, route }: any) {
                 ) : null}
 
                 {canRevealResale ? (
-                  <TouchableOpacity style={styles.savePolicyButton} onPress={saveCurrentPolicy}>
-                    <Text style={styles.savePolicyButtonText}>{sectionNameOf(currentDraft) ? `${sectionNameOf(currentDraft)} 정책 저장` : '좌석 정책 저장'}</Text>
-                  </TouchableOpacity>
+                  <View style={styles.stepCard}>
+                    <Text style={styles.builderTitle}>STEP 5 · 좌석 정책 저장</Text>
+                    <Text style={styles.helpText}>저장하면 요약 카드로 접히고, 다시 눌러 수정할 수 있습니다.</Text>
+                    <TouchableOpacity style={styles.savePolicyButton} onPress={saveCurrentPolicy}>
+                      <Text style={styles.savePolicyButtonText}>{sectionNameOf(currentDraft) ? `${sectionNameOf(currentDraft)} 정책 저장` : '좌석 정책 저장'}</Text>
+                    </TouchableOpacity>
+                  </View>
                 ) : null}
               </View>
             </View>
           ) : null}
         </View>
 
-        {flowPage === 3 ? (
+        {flowPage === 3 && hasSavedPolicies ? (
           <View style={styles.statusBand}>
             <Text style={styles.statusLabel}>최종 발행 영역</Text>
             <Text style={styles.statusLine}>총 {totalConfiguredCapacity || '-'}장 · 발행 {issuedCount}장 · 남은 {totalConfiguredCapacity ? Math.max(totalConfiguredCapacity - issuedCount, 0) : '-'}장</Text>
@@ -748,7 +761,7 @@ export default function TicketIssuePage({ navigation, route }: any) {
           </TouchableOpacity>
         ) : null}
 
-        {flowPage === 3 ? (
+        {flowPage === 3 && hasSavedPolicies ? (
           <View style={styles.compactCard}>
             <Text style={styles.compactTitle}>발행 티켓 요약</Text>
             {tickets.length === 0 ? (
@@ -846,11 +859,140 @@ function RoundSelector({
   );
 }
 
-function DateTimeField({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (value: string) => void; placeholder: string }) {
+function monthTitle(date: Date) {
+  return `${date.getFullYear()}년 ${date.getMonth() + 1}월`;
+}
+
+function sameDate(left: string, right: Date) {
+  return left === localDate(right);
+}
+
+function buildCalendarCells(month: Date) {
+  const firstDay = new Date(month.getFullYear(), month.getMonth(), 1);
+  const startOffset = firstDay.getDay();
+  const cells: Array<Date | null> = [];
+  for (let index = 0; index < 42; index += 1) {
+    const dayNumber = index - startOffset + 1;
+    const date = new Date(month.getFullYear(), month.getMonth(), dayNumber);
+    cells.push(date.getMonth() === month.getMonth() ? date : null);
+  }
+  return cells;
+}
+
+function DatePickerField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+  const initialDate = value ? new Date(`${value}T00:00:00`) : new Date();
+  const [open, setOpen] = useState(false);
+  const [month, setMonth] = useState(new Date(initialDate.getFullYear(), initialDate.getMonth(), 1));
+  const [draftValue, setDraftValue] = useState(value || localDate(new Date()));
+
+  const openPicker = () => {
+    const base = value ? new Date(`${value}T00:00:00`) : new Date();
+    setDraftValue(value || localDate(base));
+    setMonth(new Date(base.getFullYear(), base.getMonth(), 1));
+    setOpen(true);
+  };
+
   return (
     <View style={styles.dateTimeField}>
       <Text style={styles.smallLabel}>{label}</Text>
-      <TextInput style={styles.input} value={value} onChangeText={onChange} placeholder={placeholder} />
+      <TouchableOpacity style={styles.pickerButton} onPress={openPicker}>
+        <Text style={styles.pickerButtonText}>{formatDateDot(value)}</Text>
+      </TouchableOpacity>
+      <Modal visible={open} transparent animationType="slide" onRequestClose={() => setOpen(false)}>
+        <View style={styles.sheetOverlay}>
+          <View style={styles.sheet}>
+            <View style={styles.sheetHeader}>
+              <Text style={styles.sheetTitle}>{label}</Text>
+              <TouchableOpacity onPress={() => setOpen(false)}>
+                <Text style={styles.sheetClose}>닫기</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.calendarHeader}>
+              <TouchableOpacity style={styles.calendarNavButton} onPress={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))}>
+                <Text style={styles.calendarNavText}>‹</Text>
+              </TouchableOpacity>
+              <Text style={styles.calendarTitle}>{monthTitle(month)}</Text>
+              <TouchableOpacity style={styles.calendarNavButton} onPress={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))}>
+                <Text style={styles.calendarNavText}>›</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.weekRow}>
+              {['일', '월', '화', '수', '목', '금', '토'].map((day) => <Text key={day} style={styles.weekText}>{day}</Text>)}
+            </View>
+            <View style={styles.calendarGrid}>
+              {buildCalendarCells(month).map((date, index) => {
+                const selected = date ? sameDate(draftValue, date) : false;
+                return (
+                  <TouchableOpacity
+                    key={`${month.getFullYear()}-${month.getMonth()}-${index}`}
+                    style={[styles.calendarCell, !date && styles.calendarCellEmpty, selected && styles.calendarCellSelected]}
+                    disabled={!date}
+                    onPress={() => date && setDraftValue(localDate(date))}
+                  >
+                    <Text style={[styles.calendarCellText, selected && styles.calendarCellTextSelected]}>{date ? date.getDate() : ''}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            <TouchableOpacity style={styles.sheetPrimaryButton} onPress={() => { onChange(draftValue); setOpen(false); }}>
+              <Text style={styles.sheetPrimaryText}>완료</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+    </View>
+  );
+}
+
+function TimePickerField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [hour, setHour] = useState((value || '00:00').split(':')[0] || '00');
+  const [minute, setMinute] = useState((value || '00:00').split(':')[1] || '00');
+
+  const openPicker = () => {
+    const [nextHour = '00', nextMinute = '00'] = (value || '00:00').split(':');
+    setHour(pad(Number(nextHour)));
+    setMinute(pad(Number(nextMinute)));
+    setOpen(true);
+  };
+
+  return (
+    <View style={styles.dateTimeField}>
+      <Text style={styles.smallLabel}>{label}</Text>
+      <TouchableOpacity style={styles.pickerButton} onPress={openPicker}>
+        <Text style={styles.pickerButtonText}>{value || '00:00'}</Text>
+      </TouchableOpacity>
+      <Modal visible={open} transparent animationType="slide" onRequestClose={() => setOpen(false)}>
+        <View style={styles.sheetOverlay}>
+          <View style={styles.sheet}>
+            <View style={styles.sheetHeader}>
+              <Text style={styles.sheetTitle}>{label}</Text>
+              <TouchableOpacity onPress={() => setOpen(false)}>
+                <Text style={styles.sheetClose}>닫기</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.timePickerRow}>
+              <ScrollView style={styles.timeColumn} contentContainerStyle={styles.timeColumnContent}>
+                {HOUR_OPTIONS.map((option) => (
+                  <TouchableOpacity key={option} style={[styles.timeOption, hour === option && styles.timeOptionActive]} onPress={() => setHour(option)}>
+                    <Text style={[styles.timeOptionText, hour === option && styles.timeOptionTextActive]}>{option}시</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+              <ScrollView style={styles.timeColumn} contentContainerStyle={styles.timeColumnContent}>
+                {MINUTE_OPTIONS.map((option) => (
+                  <TouchableOpacity key={option} style={[styles.timeOption, minute === option && styles.timeOptionActive]} onPress={() => setMinute(option)}>
+                    <Text style={[styles.timeOptionText, minute === option && styles.timeOptionTextActive]}>{option}분</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+            <TouchableOpacity style={styles.sheetPrimaryButton} onPress={() => { onChange(`${hour}:${minute}`); setOpen(false); }}>
+              <Text style={styles.sheetPrimaryText}>완료</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -922,10 +1064,17 @@ const styles = StyleSheet.create({
   savedPolicyList: { gap: 8, marginBottom: 12 },
   savedPolicyCard: { borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 8, backgroundColor: '#FFFFFF' },
   savedPolicyHeader: { padding: 12 },
+  savedPolicyHeaderTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 },
+  savedBadge: { color: '#2563EB', fontSize: 12, fontWeight: '900' },
+  savedPolicyArrow: { color: '#64748B', fontSize: 12, fontWeight: '900' },
   savedPolicyText: { color: '#0F172A', fontSize: 13, fontWeight: '900', lineHeight: 19 },
+  savedPolicyMeta: { marginTop: 3, color: '#475569', fontSize: 12, fontWeight: '800', lineHeight: 17 },
   savedPolicyDetail: { borderTopWidth: 1, borderTopColor: '#F1F5F9', padding: 12 },
-  builderBox: { borderWidth: 1, borderColor: '#BFDBFE', borderRadius: 8, backgroundColor: '#F8FBFF', padding: 12 },
+  builderBox: { gap: 12 },
   builderTitle: { color: '#0F172A', fontSize: 14, fontWeight: '900' },
+  stepCard: { borderWidth: 1, borderColor: '#DBEAFE', borderRadius: 8, backgroundColor: '#FFFFFF', padding: 12 },
+  activeStepCard: { borderWidth: 2, borderColor: '#93C5FD', backgroundColor: '#F8FBFF' },
+  formStepCard: { borderColor: '#BFDBFE', backgroundColor: '#F8FBFF' },
   stepBox: { marginTop: 14, borderTopWidth: 1, borderTopColor: '#DBEAFE', paddingTop: 14 },
   chipGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 },
   choiceChip: { borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: '#FFFFFF' },
@@ -944,14 +1093,17 @@ const styles = StyleSheet.create({
   toggleOff: { backgroundColor: '#F1F5F9', color: '#64748B' },
   savePolicyButton: { marginTop: 14, borderWidth: 1, borderColor: '#2563EB', borderRadius: 8, paddingVertical: 12, alignItems: 'center', backgroundColor: '#EFF6FF' },
   savePolicyButtonText: { color: '#2563EB', fontWeight: '900' },
-  issuePreviewBox: { marginTop: 12, backgroundColor: '#FFFFFF', borderRadius: 8, padding: 12, borderWidth: 1, borderColor: '#E2E8F0' },
+  issuePreviewBox: { marginTop: 12, backgroundColor: '#EFF6FF', borderRadius: 8, padding: 12, borderWidth: 1, borderColor: '#BFDBFE' },
   previewLabel: { marginTop: 10, color: '#64748B', fontSize: 12, fontWeight: '900' },
   previewText: { marginTop: 5, color: '#0F172A', fontWeight: '800', lineHeight: 20 },
+  previewTextStrong: { marginTop: 5, color: '#0F172A', fontSize: 16, fontWeight: '900', lineHeight: 22 },
   statusBand: { marginTop: 14, backgroundColor: '#FFFFFF', borderRadius: 8, padding: 14, borderWidth: 1, borderColor: '#E2E8F0' },
   statusLabel: { color: '#64748B', fontSize: 12, fontWeight: '900' },
   statusLine: { marginTop: 6, color: '#0F172A', fontSize: 17, fontWeight: '900' },
   removeButton: { marginTop: 10, alignSelf: 'flex-start', borderWidth: 1, borderColor: '#FECACA', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6, backgroundColor: '#FEF2F2' },
   removeButtonText: { color: '#B91C1C', fontSize: 12, fontWeight: '900' },
+  editButton: { marginTop: 10, alignSelf: 'flex-start', borderWidth: 1, borderColor: '#BFDBFE', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6, backgroundColor: '#EFF6FF' },
+  editButtonText: { color: '#2563EB', fontSize: 12, fontWeight: '900' },
   secondaryButton: { borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, paddingVertical: 14, alignItems: 'center', marginTop: 12, backgroundColor: '#FFFFFF' },
   secondaryButtonText: { color: '#0F172A', fontSize: 15, fontWeight: '900' },
   emptyText: { color: '#94A3B8', paddingVertical: 14, textAlign: 'center' },
@@ -963,4 +1115,32 @@ const styles = StyleSheet.create({
   bottomSecondaryButton: { flex: 0.8, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, paddingVertical: 15, alignItems: 'center', backgroundColor: '#FFFFFF' },
   bottomSecondaryText: { color: '#0F172A', fontSize: 15, fontWeight: '900' },
   disabledButton: { opacity: 0.45 },
+  pickerButton: { borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, padding: 11, backgroundColor: '#FFFFFF' },
+  pickerButtonText: { color: '#0F172A', fontWeight: '900' },
+  sheetOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(15, 23, 42, 0.35)' },
+  sheet: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 16, borderTopRightRadius: 16, padding: 16, maxHeight: '82%' },
+  sheetHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+  sheetTitle: { color: '#0F172A', fontSize: 16, fontWeight: '900' },
+  sheetClose: { color: '#64748B', fontWeight: '900' },
+  calendarHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
+  calendarNavButton: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F1F5F9' },
+  calendarNavText: { color: '#0F172A', fontSize: 24, fontWeight: '900' },
+  calendarTitle: { color: '#0F172A', fontSize: 15, fontWeight: '900' },
+  weekRow: { flexDirection: 'row', marginBottom: 6 },
+  weekText: { flex: 1, textAlign: 'center', color: '#64748B', fontSize: 12, fontWeight: '900' },
+  calendarGrid: { flexDirection: 'row', flexWrap: 'wrap' },
+  calendarCell: { width: `${100 / 7}%`, aspectRatio: 1, alignItems: 'center', justifyContent: 'center' },
+  calendarCellEmpty: { opacity: 0.18 },
+  calendarCellSelected: { backgroundColor: '#2563EB', borderRadius: 999 },
+  calendarCellText: { color: '#0F172A', fontWeight: '800' },
+  calendarCellTextSelected: { color: '#FFFFFF' },
+  sheetPrimaryButton: { marginTop: 14, backgroundColor: '#2563EB', borderRadius: 8, paddingVertical: 13, alignItems: 'center' },
+  sheetPrimaryText: { color: '#FFFFFF', fontWeight: '900' },
+  timePickerRow: { flexDirection: 'row', gap: 10, height: 260 },
+  timeColumn: { flex: 1, borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 8, backgroundColor: '#F8FAFC' },
+  timeColumnContent: { padding: 8, gap: 6 },
+  timeOption: { borderRadius: 8, paddingVertical: 10, alignItems: 'center', backgroundColor: '#FFFFFF' },
+  timeOptionActive: { backgroundColor: '#EFF6FF', borderWidth: 1, borderColor: '#2563EB' },
+  timeOptionText: { color: '#334155', fontWeight: '900' },
+  timeOptionTextActive: { color: '#2563EB' },
 });
