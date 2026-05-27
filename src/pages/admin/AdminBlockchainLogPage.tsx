@@ -70,6 +70,16 @@ function shortText(value?: string, length = 12) {
   return value.length > length ? `${value.slice(0, length)}...` : value;
 }
 
+function getTransactionTimestamp(item: BlockchainTransactionRecord) {
+  const timestamp = item.createdAt ?? item.updatedAt;
+  if (!timestamp) {
+    return 0;
+  }
+
+  const date = new Date(timestamp);
+  return Number.isNaN(date.getTime()) ? 0 : date.getTime();
+}
+
 export function AdminBlockchainLogPage() {
   const [items, setItems] = useState<BlockchainTransactionRecord[]>([]);
   const [hasLoaded, setHasLoaded] = useState(false);
@@ -108,20 +118,22 @@ export function AdminBlockchainLogPage() {
 
   const filteredItems = useMemo(() => {
     const keyword = query.trim().toLowerCase();
-    return items.filter((item) => {
-      const matchesStatus = status === "ALL" || item.status === status;
-      if (!matchesStatus) {
-        return false;
-      }
-      if (!keyword) {
-        return true;
-      }
-      return [item.id, item.action, item.transactionHash, item.txHash, item.contractAddress, item.status, item.errorMessage]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase()
-        .includes(keyword);
-    });
+    return [...items]
+      .sort((left, right) => getTransactionTimestamp(right) - getTransactionTimestamp(left))
+      .filter((item) => {
+        const matchesStatus = status === "ALL" || item.status === status;
+        if (!matchesStatus) {
+          return false;
+        }
+        if (!keyword) {
+          return true;
+        }
+        return [item.id, item.action, item.transactionHash, item.txHash, item.contractAddress, item.status, item.errorMessage]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase()
+          .includes(keyword);
+      });
   }, [items, query, status]);
 
   const failedCount = items.filter((item) => item.status === "FAILED").length;
