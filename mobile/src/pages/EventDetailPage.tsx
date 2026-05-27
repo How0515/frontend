@@ -11,6 +11,7 @@ import {
   View,
 } from 'react-native';
 import { backendApi } from '../lib/backend';
+import { formatEventCategory } from '../lib/ticketDisplay';
 import type { EventDetail, ResaleListing, TicketDetail } from '../types/api';
 
 const PRIMARY_TICKET_PAGE_SIZE = 20;
@@ -103,7 +104,7 @@ export default function EventDetailPage({ route, navigation }: any) {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.hero}>
-        <Text style={styles.category}>{event.category}</Text>
+        <Text style={styles.category}>{formatEventCategory(event.category)}</Text>
         <Text style={styles.title}>{event.name || event.title}</Text>
         <Text style={styles.meta}>{event.venue}</Text>
         <Text style={styles.meta}>{event.eventAt ? new Date(event.eventAt).toLocaleString() : '-'}</Text>

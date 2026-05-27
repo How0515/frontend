@@ -135,6 +135,7 @@ export function formatEventCategory(category?: string | null) {
     FESTIVAL: '페스티벌',
     ETC: '기타',
     OTHER: '기타',
+    CONFERENCE: '기타',
   };
   const key = normalized(category);
   return labels[key] ?? category ?? '기타';

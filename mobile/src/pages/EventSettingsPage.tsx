@@ -118,6 +118,13 @@ function imageSourceUri(value: string) {
   return `${apiRoot}${value.startsWith('/') ? '' : '/'}${value}`;
 }
 
+function normalizeCategory(category?: string | null) {
+  if (String(category ?? '').toUpperCase() === 'CONFERENCE') {
+    return 'ETC';
+  }
+  return category || 'CONCERT';
+}
+
 function toRoundDraft(round: EventRound, index: number): RoundDraft {
   return {
     id: round.id || `${Date.now()}-${index}`,
@@ -185,7 +192,7 @@ export default function EventSettingsPage({ navigation, route }: any) {
         : [fallbackRound(detail)];
       setEvent(detail);
       setName(detail.name || detail.title || '');
-      setCategory(detail.category || 'CONCERT');
+      setCategory(normalizeCategory(detail.category));
       setVenue(detail.venue || detail.location?.name || '');
       setDescription(detail.description || '');
       setImageUrl(detail.imageUrl || '');

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { backendApi } from '../lib/backend';
-import { formatEventDate } from '../lib/ticketDisplay';
+import { formatEventCategory, formatEventDate } from '../lib/ticketDisplay';
 import type { EventDetail, ResaleListing, UserProfile } from '../types/api';
 
 type SortMode = 'latest' | 'priceAsc' | 'priceDesc' | 'closingSoon';
@@ -231,7 +231,7 @@ export default function ResaleListPage({ navigation, route }: any) {
                 </View>
                 <Text style={styles.title}>{groupTitleOf(item)}</Text>
                 <Text style={styles.meta}>{formatEventDate(groupDateOf(item))}</Text>
-                <Text style={styles.meta}>{[event?.category, event?.venue].filter(Boolean).join(' · ') || '이벤트 정보 확인 중'}</Text>
+                <Text style={styles.meta}>{[formatEventCategory(event?.category), event?.venue].filter(Boolean).join(' · ') || '이벤트 정보 확인 중'}</Text>
               </TouchableOpacity>
             );
           }}

@@ -24,8 +24,7 @@ function eventTitle(event: EventSummary) {
 }
 
 function categoryLabel(category?: string) {
-  const label = formatEventCategory(category);
-  return label === '페스티벌' ? '기타' : label;
+  return formatEventCategory(category);
 }
 
 function eventStart(event: EventSummary) {

@@ -1,15 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { backendApi } from '../lib/backend';
-import { formatEventDate, getEventDisplayStatus } from '../lib/ticketDisplay';
+import { formatEventCategory, formatEventDate, getEventDisplayStatus } from '../lib/ticketDisplay';
 import type { EventSummary } from '../types/api';
 
 const CATEGORIES = [
   { id: 'ALL', label: '전체' },
-  { id: 'CONCERT', label: '콘서트' },
+  { id: 'CONCERT', label: '공연' },
   { id: 'SPORTS', label: '스포츠' },
   { id: 'EXHIBITION', label: '전시' },
   { id: 'FESTIVAL', label: '페스티벌' },
+  { id: 'ETC', label: '기타' },
 ];
 
 function eventName(event: EventSummary) {
@@ -51,7 +52,7 @@ export default function UserHomePage({ navigation }: any) {
   const renderEventItem = ({ item }: { item: EventSummary }) => (
     <TouchableOpacity style={styles.card} onPress={() => navigation.navigate('EventDetail', { eventId: item.id })}>
       <View style={styles.cardHeader}>
-        <Text style={styles.category}>{item.category || 'EVENT'}</Text>
+        <Text style={styles.category}>{formatEventCategory(item.category)}</Text>
         <Text style={styles.status}>{getEventDisplayStatus(item).label}</Text>
       </View>
       <Text style={styles.cardTitle} numberOfLines={2}>{eventName(item)}</Text>

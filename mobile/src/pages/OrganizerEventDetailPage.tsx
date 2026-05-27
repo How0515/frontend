@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { errorMessage } from '../lib/account';
 import { backendApi } from '../lib/backend';
-import { formatEventRange, formatEventStatus, getEventDisplayStatus } from '../lib/ticketDisplay';
+import { formatEventCategory, formatEventRange, formatEventStatus, getEventDisplayStatus } from '../lib/ticketDisplay';
 import type { EventDetail, TicketDetail } from '../types/api';
 
 function eventTitle(event: EventDetail) {
@@ -128,7 +128,7 @@ export default function OrganizerEventDetailPage({ navigation, route }: any) {
         )}
         <View style={styles.heroCopy}>
           <View style={styles.heroTopRow}>
-            <Text style={styles.category}>{event.category || 'EVENT'}</Text>
+            <Text style={styles.category}>{formatEventCategory(event.category)}</Text>
             <Text style={[styles.statusBadge, styles[`tone_${displayStatus.tone}`]]}>{displayStatus.label}</Text>
           </View>
           <Text style={styles.title}>{eventTitle(event)}</Text>
