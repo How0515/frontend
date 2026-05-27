@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { backendApi } from '../lib/backend';
-import { formatEventCategory, formatEventDate, getEventDisplayStatus } from '../lib/ticketDisplay';
+import { formatEventCategory, formatEventDate, getEventDisplayStatus, getNextRoundTime, operationSortRank } from '../lib/ticketDisplay';
 import type { EventSummary } from '../types/api';
 
 const CATEGORIES = [
@@ -22,6 +22,16 @@ export default function UserHomePage({ navigation }: any) {
   const [keyword, setKeyword] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('ALL');
   const [loading, setLoading] = useState(false);
+
+  const sortedEvents = useMemo(() => {
+    return [...events].sort((left, right) => {
+      const rankDiff = operationSortRank(left) - operationSortRank(right);
+      if (rankDiff !== 0) return rankDiff;
+      const leftTime = getNextRoundTime(left);
+      const rightTime = getNextRoundTime(right);
+      return (Number.isNaN(leftTime) ? Number.MAX_SAFE_INTEGER : leftTime) - (Number.isNaN(rightTime) ? Number.MAX_SAFE_INTEGER : rightTime);
+    });
+  }, [events]);
 
   const loadEvents = async (search = keyword, category = selectedCategory) => {
     setLoading(true);
@@ -103,7 +113,7 @@ export default function UserHomePage({ navigation }: any) {
         </View>
       ) : (
         <FlatList
-          data={events}
+          data={sortedEvents}
           keyExtractor={(item) => item.id}
           renderItem={renderEventItem}
           contentContainerStyle={styles.list}

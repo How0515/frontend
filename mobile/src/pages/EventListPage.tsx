@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { backendApi } from '../lib/backend';
-import { formatEventCategory, formatEventDate, getEventDisplayStatus } from '../lib/ticketDisplay';
+import { formatEventCategory, formatEventDate, getEventDisplayStatus, getNextRoundTime, operationSortRank } from '../lib/ticketDisplay';
 import type { EventSummary } from '../types/api';
 
 const CATEGORIES = [
@@ -52,8 +52,14 @@ export default function EventListPage({ navigation, route }: any) {
   }, [selectedCategory]);
 
   const visibleEvents = useMemo(() => {
-    if (selectedStatus === 'ALL') return events;
-    return events.filter((event) => event.status === selectedStatus);
+    const filteredEvents = selectedStatus === 'ALL' ? events : events.filter((event) => event.status === selectedStatus);
+    return [...filteredEvents].sort((left, right) => {
+      const rankDiff = operationSortRank(left) - operationSortRank(right);
+      if (rankDiff !== 0) return rankDiff;
+      const leftTime = getNextRoundTime(left);
+      const rightTime = getNextRoundTime(right);
+      return (Number.isNaN(leftTime) ? Number.MAX_SAFE_INTEGER : leftTime) - (Number.isNaN(rightTime) ? Number.MAX_SAFE_INTEGER : rightTime);
+    });
   }, [events, selectedStatus]);
 
   const renderEvent = ({ item }: { item: EventSummary }) => (
