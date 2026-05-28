@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { errorMessage } from '../lib/account';
 import { backendApi } from '../lib/backend';
+import { showDialog } from '../lib/dialog';
 import type { EventDetail, ResaleListing, TicketDetail, UserProfile } from '../types/api';
 
 const STATUS_LABEL: Record<string, string> = {
@@ -52,7 +53,7 @@ export default function ResaleDetailPage({ route, navigation }: any) {
         setEvent(eventData);
         setMe(meData);
       } catch (cause: any) {
-        Alert.alert('오류', errorMessage(cause, '리셀 티켓 정보를 불러오지 못했습니다.'));
+        showDialog('오류', errorMessage(cause, '리셀 티켓 정보를 불러오지 못했습니다.'));
       } finally {
         setLoading(false);
       }
@@ -78,18 +79,18 @@ export default function ResaleDetailPage({ route, navigation }: any) {
   const purchase = async () => {
     if (blockMessage) {
       setFeedback(blockMessage);
-      Alert.alert('구매 불가', blockMessage);
+      showDialog('구매 불가', blockMessage);
       return;
     }
     if (!me?.walletAddress?.trim()) {
-      Alert.alert('지갑 로그인 필요', '리셀 티켓 구매는 지갑 로그인 후 가능합니다.', [
+      showDialog('지갑 로그인 필요', '리셀 티켓 구매는 지갑 로그인 후 가능합니다.', [
         { text: '취소', style: 'cancel' },
         { text: '지갑 로그인', onPress: () => navigation.navigate('Auth', { initialRole: 'USER', walletMode: true, autoWalletLogin: true }) },
       ]);
       return;
     }
 
-    Alert.alert('리셀 티켓 구매', '선택한 리셀 티켓을 구매할까요?', [
+    showDialog('리셀 티켓 구매', '선택한 리셀 티켓을 구매할까요?', [
       { text: '취소', style: 'cancel' },
       { text: '구매하기', onPress: () => void submitPurchase() },
     ]);
@@ -110,7 +111,7 @@ export default function ResaleDetailPage({ route, navigation }: any) {
     } catch (cause: any) {
       const message = errorMessage(cause, '리셀 티켓 구매에 실패했습니다.');
       setFeedback(message);
-      Alert.alert('구매 실패', message);
+      showDialog('구매 실패', message);
     } finally {
       setSubmitting(false);
     }

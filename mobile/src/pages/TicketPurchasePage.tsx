@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { backendApi } from '../lib/backend';
+import { showDialog } from '../lib/dialog';
 import { formatCompactDateTime, formatTicketStatus, weiToEth } from '../lib/ticketDisplay';
 import type { EventDetail, TicketDetail, UserProfile } from '../types/api';
 
@@ -77,7 +78,7 @@ export default function TicketPurchasePage({ route, navigation }: any) {
         const targetEventId = eventId ?? ticketData.eventId;
         if (targetEventId) setEvent(await backendApi.getEvent(String(targetEventId)));
       } catch (error: any) {
-        Alert.alert('오류', error.message || '티켓 정보를 불러오지 못했습니다.');
+        showDialog('오류', error.message || '티켓 정보를 불러오지 못했습니다.');
       } finally {
         setLoading(false);
       }
@@ -93,14 +94,14 @@ export default function TicketPurchasePage({ route, navigation }: any) {
       const purchased = await backendApi.purchasePrimary(String(ticketId));
       navigation.replace('PurchaseComplete', { type: 'primary', ticketId: purchased.id ?? purchased.ticketId, eventId: purchased.eventId });
     } catch (error: any) {
-      Alert.alert('구매 실패', error.message || '티켓 구매에 실패했습니다.');
+      showDialog('구매 실패', error.message || '티켓 구매에 실패했습니다.');
     } finally {
       setSubmitting(false);
     }
   };
 
   const requireWalletLogin = () => {
-    Alert.alert('지갑 로그인 필요', '티켓 구매는 지갑 로그인 후 가능합니다.', [
+    showDialog('지갑 로그인 필요', '티켓 구매는 지갑 로그인 후 가능합니다.', [
       { text: '취소', style: 'cancel' },
       { text: '지갑 로그인', onPress: () => navigation.navigate('Auth', { initialRole: 'USER', walletMode: true, autoWalletLogin: true }) },
     ]);
@@ -113,7 +114,7 @@ export default function TicketPurchasePage({ route, navigation }: any) {
       return;
     }
 
-    Alert.alert('티켓 예매', '선택한 티켓을 예매할까요?', [
+    showDialog('티켓 예매', '선택한 티켓을 예매할까요?', [
       { text: '취소', style: 'cancel' },
       { text: '예매하기', onPress: () => void submitPurchase() },
     ]);
