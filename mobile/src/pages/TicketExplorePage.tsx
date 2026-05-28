@@ -1,6 +1,6 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
-import { ActivityIndicator, Alert, FlatList, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { errorMessage } from '../lib/account';
 import { backendApi } from '../lib/backend';
 import { formatCompactDateTime, getTicketDisplayStatus, weiToEth } from '../lib/ticketDisplay';
@@ -33,12 +33,14 @@ function ticketId(ticket: TicketDetail) {
   return String(ticket.id ?? ticket.ticketId ?? ticket.seatInfo);
 }
 
-function priceValue(ticket: TicketDetail) {
-  try {
-    return BigInt(ticket.originalPriceWei ?? ticket.priceWei ?? '0');
-  } catch {
-    return BigInt(0);
-  }
+function comparePrice(a: TicketDetail, b: TicketDetail): number {
+  const toInt = (t: TicketDetail) => String(t.originalPriceWei ?? t.priceWei ?? '0').split('.')[0] || '0';
+  const rawA = toInt(a);
+  const rawB = toInt(b);
+  const len = Math.max(rawA.length, rawB.length);
+  const pa = rawA.padStart(len, '0');
+  const pb = rawB.padStart(len, '0');
+  return pa < pb ? -1 : pa > pb ? 1 : 0;
 }
 
 function roundLabel(round: EventRound, index: number) {
@@ -113,8 +115,8 @@ export default function TicketExplorePage({ navigation, route }: any) {
       return matchesRound && matchesSection && matchesStatus && matchesResale;
     });
     return [...base].sort((a, b) => {
-      if (sortMode === 'priceAsc') return priceValue(a) < priceValue(b) ? -1 : priceValue(a) > priceValue(b) ? 1 : 0;
-      if (sortMode === 'priceDesc') return priceValue(a) > priceValue(b) ? -1 : priceValue(a) < priceValue(b) ? 1 : 0;
+      if (sortMode === 'priceAsc') return comparePrice(a, b);
+      if (sortMode === 'priceDesc') return comparePrice(b, a);
       if (sortMode === 'seat') return String(a.seatInfo || '').localeCompare(String(b.seatInfo || ''), 'ko-KR', { numeric: true });
       return new Date(b.createdAt || '').getTime() - new Date(a.createdAt || '').getTime();
     });
@@ -227,11 +229,22 @@ export default function TicketExplorePage({ navigation, route }: any) {
   );
 }
 
-function FilterBlock({ title, children }: { title: string; children: React.ReactNode }) {
+function FilterBlock({ title, children, maxVisible = 8 }: { title: string; children: React.ReactNode; maxVisible?: number }) {
+  const [expanded, setExpanded] = useState(false);
+  const childArray = React.Children.toArray(children);
+  const hasMore = childArray.length > maxVisible;
+  const visible = expanded || !hasMore ? childArray : childArray.slice(0, maxVisible);
   return (
     <View style={styles.filterBlock}>
-      <Text style={styles.filterTitle}>{title}</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterList}>{children}</ScrollView>
+      <View style={styles.filterTitleRow}>
+        <Text style={styles.filterTitle}>{title}</Text>
+        {hasMore && (
+          <TouchableOpacity onPress={() => setExpanded((v) => !v)}>
+            <Text style={styles.filterExpand}>{expanded ? '접기' : `+${childArray.length - maxVisible}개 더보기`}</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+      <View style={styles.filterList}>{visible}</View>
     </View>
   );
 }
@@ -267,8 +280,10 @@ const styles = StyleSheet.create({
   metricLabel: { color: '#64748B', fontSize: 12, fontWeight: '800' },
   metricValue: { marginTop: 8, color: '#0F172A', fontSize: 24, fontWeight: '900' },
   filterBlock: { marginTop: 12 },
-  filterTitle: { color: '#334155', fontSize: 12, fontWeight: '900', marginBottom: 7 },
-  filterList: { gap: 8, paddingBottom: 2 },
+  filterTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 7 },
+  filterTitle: { color: '#334155', fontSize: 12, fontWeight: '900' },
+  filterExpand: { color: '#2563EB', fontSize: 12, fontWeight: '800' },
+  filterList: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingBottom: 4 },
   filterChip: { borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: '#FFFFFF' },
   activeFilterChip: { borderColor: '#2563EB', backgroundColor: '#EFF6FF' },
   filterChipText: { color: '#475569', fontWeight: '800', fontSize: 12 },
