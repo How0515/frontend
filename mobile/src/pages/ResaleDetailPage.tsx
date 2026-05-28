@@ -85,7 +85,8 @@ export default function ResaleDetailPage({ route, navigation }: any) {
     setSubmitting(true);
     setFeedback('');
     try {
-      const purchased = await backendApi.purchaseResale(String(listingId));
+      const targetListingId = listing?.id ?? listing?.listingId ?? listingId;
+      const purchased = await backendApi.purchaseResale(String(targetListingId));
       navigation.replace('PurchaseComplete', {
         type: 'resale',
         listingId: purchased.id ?? purchased.listingId,
@@ -127,7 +128,7 @@ export default function ResaleDetailPage({ route, navigation }: any) {
 
       <TouchableOpacity
         style={[styles.button, (submitting || isBlocked) && styles.disabledButton]}
-        disabled={submitting}
+        disabled={submitting || isBlocked}
         onPress={purchase}
       >
         <Text style={styles.buttonText}>{buttonText}</Text>
