@@ -16,10 +16,18 @@ function buildError(cause: unknown) {
   if (status === 401 || status === 403) {
     return "관리자 로그인이 필요합니다. 관리자 계정으로 다시 로그인해주세요.";
   }
+  const serverMessage = (cause as { response?: { data?: { message?: string } } } | undefined)?.response?.data?.message;
+  if (serverMessage) {
+    return serverMessage;
+  }
   if (cause instanceof Error) {
     return cause.message;
   }
   return "대시보드 지표를 불러오지 못했습니다.";
+}
+
+function isAuthError(message: string) {
+  return message.includes("관리자 로그인이 필요합니다");
 }
 
 function formatCount(value?: number) {
@@ -57,7 +65,7 @@ export function AdminDashboardPage() {
             backendApi.getOrganizerApplications({ status: "PENDING", page: 0, size: 1 }),
             backendApi.getAdminEvents({ status: "INACTIVE", page: 0, size: 1 }),
             backendApi.getUsers({ status: "ACTIVE", page: 0, size: 1 }),
-            backendApi.getAdminEvents({ status: "ACTIVE", page: 0, size: 1 }),
+            backendApi.getAdminEvents({ status: "PUBLISHED", page: 0, size: 1 }),
             backendApi.getDisputes({ status: "OPEN", page: 0, size: 1 }),
             backendApi.getDisputes({ status: "REVIEWING", page: 0, size: 1 }),
           ]);
@@ -180,9 +188,11 @@ export function AdminDashboardPage() {
         {error ? (
           <div className="dash-alert">
             <span>{error}</span>
-            <a className="button" href="/login">
-              다시 로그인
-            </a>
+            {isAuthError(error) ? (
+              <a className="button" href="/login">
+                다시 로그인
+              </a>
+            ) : null}
           </div>
         ) : null}
 

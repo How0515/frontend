@@ -4,14 +4,14 @@ import { AdminPagination } from "../../components/AdminPagination";
 import { backendApi } from "../../lib/backend";
 import type { EventDetail } from "../../types/api";
 
-type FilterStatus = "ALL" | "ACTIVE" | "INACTIVE" | "CANCELED";
+type FilterStatus = "ALL" | "PUBLISHED" | "INACTIVE" | "CANCELLED";
 type FlaggedFilter = "ALL" | "FLAGGED" | "NORMAL";
 const PAGE_SIZE = 20;
 
 const STATUS_LABEL: Record<string, string> = {
-  ACTIVE: "진행 중",
+  PUBLISHED: "진행 중",
   INACTIVE: "비활성",
-  CANCELED: "취소됨",
+  CANCELLED: "취소됨",
   FLAGGED: "검토",
 };
 
@@ -28,10 +28,18 @@ function buildError(cause: unknown) {
   if (status === 401 || status === 403) {
     return "관리자 로그인이 필요합니다. 관리자 계정으로 다시 로그인하세요.";
   }
+  const serverMessage = (cause as { response?: { data?: { message?: string } } } | undefined)?.response?.data?.message;
+  if (serverMessage) {
+    return serverMessage;
+  }
   if (cause instanceof Error) {
     return cause.message;
   }
   return "이벤트 목록을 불러오지 못했습니다.";
+}
+
+function isAuthError(message: string) {
+  return message.includes("관리자 로그인이 필요합니다");
 }
 
 function shortId(value?: string) {
@@ -43,8 +51,8 @@ function shortId(value?: string) {
 
 function sortCanceledLast(events: EventDetail[]) {
   return [...events].sort((a, b) => {
-    if (a.status === "CANCELED" && b.status !== "CANCELED") return 1;
-    if (a.status !== "CANCELED" && b.status === "CANCELED") return -1;
+    if (a.status === "CANCELLED" && b.status !== "CANCELLED") return 1;
+    if (a.status !== "CANCELLED" && b.status === "CANCELLED") return -1;
     const aTime = new Date(a.eventAt ?? a.eventDateTime ?? "").getTime();
     const bTime = new Date(b.eventAt ?? b.eventDateTime ?? "").getTime();
     return (Number.isNaN(bTime) ? 0 : bTime) - (Number.isNaN(aTime) ? 0 : aTime);
@@ -153,7 +161,7 @@ export function AdminEventsPage() {
     setCancelingId(eventId);
     setError(null);
     try {
-      await backendApi.updateEventStatus(eventId, { status: "CANCELED" });
+      await backendApi.updateEventStatus(eventId, { status: "CANCELLED" });
       setActionMessage("이벤트를 취소했습니다.");
       await load();
     } catch (cause) {
@@ -172,7 +180,7 @@ export function AdminEventsPage() {
     setRestoringId(eventId);
     setError(null);
     try {
-      await backendApi.updateEventStatus(eventId, { status: "ACTIVE" });
+      await backendApi.updateEventStatus(eventId, { status: "PUBLISHED" });
       setActionMessage("이벤트를 다시 활성화했습니다.");
       await load();
     } catch (cause) {
@@ -191,9 +199,9 @@ export function AdminEventsPage() {
 
   const filterTabs: { label: string; value: FilterStatus }[] = [
     { label: "전체", value: "ALL" },
-    { label: "진행 중", value: "ACTIVE" },
+    { label: "진행 중", value: "PUBLISHED" },
     { label: "비활성", value: "INACTIVE" },
-    { label: "취소됨", value: "CANCELED" },
+    { label: "취소됨", value: "CANCELLED" },
   ];
 
   const flaggedTabs: { label: string; value: FlaggedFilter }[] = [
@@ -319,7 +327,7 @@ export function AdminEventsPage() {
           {error ? (
             <div className="ae-error">
               <span>{error}</span>
-              <Link className="button" to="/login">다시 로그인</Link>
+              {isAuthError(error) ? <Link className="button" to="/login">다시 로그인</Link> : null}
             </div>
           ) : null}
         </div>
@@ -357,9 +365,10 @@ export function AdminEventsPage() {
                   ) : (
                     visibleItems.map((event) => {
                       const isFlagged = event.flagged === true || event.status === "FLAGGED";
-                      const status = isFlagged ? "FLAGGED" : event.status ?? "ACTIVE";
-                      const isCanceled = event.status === "CANCELED";
+                      const status = isFlagged ? "FLAGGED" : event.status ?? "PUBLISHED";
+                      const isCanceled = event.status === "CANCELLED";
                       const statusLabel = event.adminCanceled && isCanceled ? "관리자 취소" : STATUS_LABEL[status] ?? status;
+                      const statusClass = status === "PUBLISHED" ? "active" : status.toLowerCase();
                       return (
                         <tr key={event.id}>
                           <td className="ae-id">#{shortId(event.id)}</td>
@@ -373,7 +382,7 @@ export function AdminEventsPage() {
                             <span> / {event.totalTicketCount ?? "-"}</span>
                           </td>
                           <td>
-                            <span className={`ae-status ${event.adminCanceled && isCanceled ? "admin-canceled" : status.toLowerCase()}`}>
+                            <span className={`ae-status ${event.adminCanceled && isCanceled ? "admin-canceled" : statusClass}`}>
                               {isFlagged ? <span className="ae-dot" /> : null}
                               {statusLabel}
                             </span>
@@ -401,11 +410,11 @@ export function AdminEventsPage() {
                               )}
                               <button
                                 className="ae-action danger"
-                                disabled={cancelingId === event.id || event.status === "CANCELED"}
+                                disabled={cancelingId === event.id || event.status === "CANCELLED"}
                                 onClick={() => void handleCancel(event.id)}
                                 type="button"
                               >
-                                {cancelingId === event.id ? "취소 중..." : event.status === "CANCELED" ? "취소됨" : "취소하기"}
+                                {cancelingId === event.id ? "취소 중..." : event.status === "CANCELLED" ? "취소됨" : "취소하기"}
                               </button>
                               {isCanceled ? (
                                 <button
