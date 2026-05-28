@@ -54,6 +54,7 @@ export type WalletNonce = {
 export type EventSummary = {
   id: string;
   organizerId?: string;
+  organizerName?: string;
   contractEventId?: string;
   title?: string;
   name?: string;
