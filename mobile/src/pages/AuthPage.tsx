@@ -227,27 +227,35 @@ async function requestPersonalSign(
 // is absent, as that indicates a WalletConnect session issue, not a network issue.
 async function ensureWalletNetwork(provider: EthereumProvider): Promise<void> {
   const chainIdHex = `0x${config.chainId.toString(16)}`;
+  const sessionTopic = getSessionTopic(provider);
 
   console.log('[WalletLogin] ensure network start', {
     chainId: config.chainId,
     chainIdHex,
     rpcUrl: config.chainRpcUrl,
+    sessionTopic,
   });
 
   try {
+    console.log('[WalletLogin] switch chain start', { chainIdHex, sessionTopic });
     await provider.request({
       method: 'wallet_switchEthereumChain',
       params: [{ chainId: chainIdHex }],
     });
 
-    console.log('[WalletLogin] switch chain success', chainIdHex);
+    console.log('[WalletLogin] switch chain success', { chainIdHex, sessionTopic });
   } catch (switchError: any) {
-    console.warn('[WalletLogin] switch chain failed', switchError);
+    const switchCode = switchError?.code;
+    const switchMsg = switchError?.message ?? '';
+    console.error('[WalletLogin] switch chain failed', {
+      code: switchCode,
+      message: switchMsg,
+      raw: (() => { try { return JSON.stringify(switchError); } catch { return String(switchError); } })(),
+      sessionTopic,
+    });
 
-    const code = switchError?.code;
-
-    if (code === 4902 || code === -32603) {
-      console.log('[WalletLogin] add chain start', chainIdHex);
+    if (switchCode === 4902 || switchCode === -32603) {
+      console.log('[WalletLogin] add chain start', { chainIdHex, sessionTopic });
 
       try {
         await provider.request({
@@ -267,9 +275,16 @@ async function ensureWalletNetwork(provider: EthereumProvider): Promise<void> {
           ],
         });
 
-        console.log('[WalletLogin] add chain success', chainIdHex);
-      } catch (addError) {
-        console.error('[WalletLogin] add chain failed', addError);
+        console.log('[WalletLogin] add chain success', { chainIdHex, sessionTopic: getSessionTopic(provider) });
+      } catch (addError: any) {
+        const addCode = addError?.code;
+        const addMsg = addError?.message ?? '';
+        console.error('[WalletLogin] add chain failed', {
+          code: addCode,
+          message: addMsg,
+          raw: (() => { try { return JSON.stringify(addError); } catch { return String(addError); } })(),
+          sessionTopic,
+        });
         throw new Error('Kaia Kairos 네트워크 추가가 필요합니다. MetaMask에서 네트워크 추가 요청을 승인해주세요.');
       }
     } else {
@@ -517,6 +532,10 @@ export default function AuthPage({ navigation, route }: any) {
       namespaces: session?.namespaces,
       accounts: session?.namespaces?.eip155?.accounts,
       chains: session?.namespaces?.eip155?.chains,
+      requiredNamespaces: session?.requiredNamespaces,
+      optionalNamespaces: session?.optionalNamespaces,
+      requiredChains: session?.requiredNamespaces?.eip155?.chains,
+      optionalChains: session?.optionalNamespaces?.eip155?.chains,
     });
     if (resolvedAddress) {
       console.log(
@@ -552,6 +571,12 @@ export default function AuthPage({ navigation, route }: any) {
       console.log('[WalletLogin] disconnect start | prev session topic:', prevTopic);
       try { disconnect('eip155'); } catch {}
       console.log('[WalletLogin] disconnect complete');
+      const sessionAfterDisconnect = getSessionFromProvider(provider);
+      console.log('[WalletLogin] session after disconnect', {
+        topic: getSessionTopic(provider),
+        accounts: sessionAfterDisconnect?.namespaces?.eip155?.accounts,
+        session: sessionAfterDisconnect,
+      });
       await clearWalletSessionStorage();
       setPendingWalletLogin(true);
       syncPendingWalletLogin(true);
@@ -565,9 +590,9 @@ export default function AuthPage({ navigation, route }: any) {
       throw new Error('EVM 지갑만 지원합니다. Ethereum 계열 지갑으로 연결해 주세요.');
     }
 
-    // provider와 resolvedAddress가 모두 확보된 뒤에만 네트워크 확인/추가/전환 실행.
-    // provider 없음(isConnected false + session 없음) 케이스는 위에서 modal로 빠지므로
-    // wallet_addEthereumChain은 항상 유효한 provider가 있는 상태에서만 호출된다.
+    // provider / session / resolvedAddress가 모두 확보된 상태에서만 여기에 도달한다.
+    // AppKit hook(isConnected, appKitAddress)이 아직 갱신되지 않아도
+    // session namespaces accounts를 신뢰하고 진행한다.
     await ensureWalletNetwork(provider as EthereumProvider);
 
     setWalletAddress(resolvedAddress);
