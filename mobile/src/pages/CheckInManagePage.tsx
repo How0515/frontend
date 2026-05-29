@@ -275,7 +275,8 @@ export default function CheckInManagePage({ navigation, route }: any) {
         {validatorOpen ? (
           <>
             <Text style={styles.cardText}>이 이벤트의 체크인 처리를 맡을 계정을 등록합니다.</Text>
-            <TextInput style={styles.input} value={validatorId} onChangeText={setValidatorId} placeholder="검증자 사용자 UUID" autoCapitalize="none" />
+            <Text style={styles.helpText}>체크인 담당자는 앱 내 '내 정보' 화면 하단에서 본인의 사용자 ID를 확인할 수 있습니다.</Text>
+            <TextInput style={styles.input} value={validatorId} onChangeText={setValidatorId} placeholder="사용자 ID" autoCapitalize="none" autoCorrect={false} />
             <TouchableOpacity style={[styles.secondaryButton, saving && styles.disabledButton]} disabled={saving} onPress={addValidator}>
               <Text style={styles.secondaryButtonText}>{saving ? '등록 중...' : '검증자 등록'}</Text>
             </TouchableOpacity>
@@ -338,6 +339,7 @@ const styles = StyleSheet.create({
   secondaryButton: { borderWidth: 1, borderColor: '#CBD5E1', backgroundColor: '#FFFFFF', borderRadius: 14, paddingVertical: 14, alignItems: 'center', marginTop: 12 },
   secondaryButtonText: { color: '#0F172A', fontSize: 16, fontWeight: '900' },
   disabledButton: { opacity: 0.55 },
+  helpText: { marginTop: 6, color: '#94A3B8', fontSize: 12, lineHeight: 17 },
   emptyText: { color: '#94A3B8', paddingTop: 14, textAlign: 'center' },
   validatorText: { marginTop: 10, color: '#475569', fontWeight: '800' },
 });

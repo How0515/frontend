@@ -237,7 +237,13 @@ export default function EventCreatePage({ navigation }: any) {
   const removeRound = (id: string) => {
     setRounds((latest) => {
       if (latest.length <= 1) return latest;
-      const nextRounds = latest.filter((round) => round.id !== id).map((round, index) => ({ ...round, title: `${index + 1}회차` }));
+      const nextRounds = latest
+        .filter((round) => round.id !== id)
+        .map((round, newIndex) => {
+          const oldIndex = latest.findIndex((item) => item.id === round.id);
+          const wasAutoTitle = !round.title || round.title === `${oldIndex + 1}회차`;
+          return wasAutoTitle ? { ...round, title: `${newIndex + 1}회차` } : round;
+        });
       setExpandedRoundIds((current) => current.filter((item) => item !== id));
       setRoundMessages((current) => {
         const next = { ...current };
@@ -481,7 +487,7 @@ export default function EventCreatePage({ navigation }: any) {
               <View key={round.id} style={styles.roundBox}>
                 <View style={styles.roundHeader}>
                   <TouchableOpacity style={styles.roundHeaderCopy} onPress={() => toggleRound(round.id)} activeOpacity={0.82}>
-                    <Text style={styles.roundTitle}>{expanded ? '▼' : '▶'} {index + 1}회차 · {formatDotDate(round.eventDate)}</Text>
+                    <Text style={styles.roundTitle}>{expanded ? '▼' : '▶'} {round.title || `${index + 1}회차`} · {formatDotDate(round.eventDate)}</Text>
                     <Text style={styles.roundSummary}>{round.startTime} ~ {round.endTime}</Text>
                   </TouchableOpacity>
                   {canDelete ? (
@@ -493,6 +499,15 @@ export default function EventCreatePage({ navigation }: any) {
 
                 {expanded ? (
                   <View style={styles.roundBody}>
+                    <View style={styles.flatField}>
+                      <Text style={styles.flatLabel}>회차 제목 (선택)</Text>
+                      <TextInput
+                        style={styles.input}
+                        value={round.title}
+                        onChangeText={(value) => updateRound(round.id, { title: value })}
+                        placeholder={`${index + 1}회차`}
+                      />
+                    </View>
                     <View style={styles.flatField}>
                       <Text style={styles.flatLabel}>이벤트 날짜</Text>
                       <SingleDatePicker

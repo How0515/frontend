@@ -93,6 +93,10 @@ export default function MyPage({ navigation }: any) {
         <Text style={styles.label}>사용 중 역할</Text>
         <Text style={styles.value}>{formatRoles(profile?.roles)}</Text>
 
+        <Text style={styles.label}>사용자 ID</Text>
+        <Text style={styles.value} selectable>{profile?.id || '-'}</Text>
+        <Text style={styles.helpText}>이벤트 체크인 검증자 등록 시 이 ID를 주최자에게 공유하세요.</Text>
+
         {!editing ? (
           <TouchableOpacity style={styles.primaryButton} onPress={() => setEditing(true)}>
             <Text style={styles.primaryButtonText}>표시 이름 수정</Text>
@@ -142,6 +146,7 @@ const styles = StyleSheet.create({
   label: { marginTop: 10, color: '#64748B', fontSize: 12, fontWeight: '800' },
   displayName: { marginTop: 5, color: '#0F172A', fontSize: 24, fontWeight: '900' },
   value: { marginTop: 5, color: '#0F172A', fontSize: 15, fontWeight: '800' },
+  helpText: { marginTop: 4, color: '#94A3B8', fontSize: 12, lineHeight: 17 },
   input: { marginTop: 7, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 12, padding: 12, backgroundColor: '#FFFFFF', color: '#0F172A' },
   primaryButton: { marginTop: 12, backgroundColor: '#2563EB', borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
   primaryButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '900' },

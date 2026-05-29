@@ -30,7 +30,6 @@ function normalizeDisputeFailure(cause: any, fallback: string) {
 }
 
 const DISPUTE_TYPES = [
-  { value: 'TICKET_NOT_DELIVERED', label: '티켓 미전달' },
   { value: 'PAYMENT_ISSUE', label: '결제 문제' },
   { value: 'FRAUD_SUSPECTED', label: '사기 의심' },
   { value: 'OTHER', label: '기타' },
