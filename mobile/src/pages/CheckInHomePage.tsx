@@ -35,9 +35,6 @@ type CheckInState = {
   buttonDanger: boolean;
 };
 
-function eventTitle(event: EventSummary) {
-  return event.name || event.title || '이벤트';
-}
 
 function formatStartSummary(startTime: number, now = new Date()) {
   if (Number.isNaN(startTime)) return '-';
@@ -217,43 +214,13 @@ export default function CheckInHomePage({ navigation }: any) {
     return sections.map((section) => {
       const events = groupedEvents[section];
       const ticketMissing = events.filter((item) => checkInStatus(item).ticketCount === 0).length;
-      return {
-        section,
-        events,
-        ticketMissing,
-        preview: section === '오늘 일정' ? events.slice(0, 2) : [],
-      };
+      const actionable = events.filter((item) => checkInStatus(item).actionable).length;
+      return { section, events, ticketMissing, actionable };
     });
   }, [groupedEvents]);
 
   const openSection = (section: CheckInSection) => {
     navigation.navigate('CheckInEventList', { section });
-  };
-
-  const renderEventCard = (item: CheckInEvent) => {
-    const status = checkInStatus(item);
-    return (
-      <View key={item.event.id} style={styles.eventCard}>
-        <View style={styles.cardHeader}>
-          <Text style={styles.eventTitle}>{eventTitle(item.event)}</Text>
-          <Text style={styles.badge}>{status.label}</Text>
-        </View>
-        <Text style={styles.eventMeta}>{status.startSummary}</Text>
-        <Text style={styles.eventMeta}>입장 완료 {status.usedCount} / {status.ticketCount}</Text>
-        <View style={styles.eventActions}>
-          <TouchableOpacity
-            style={[styles.primaryActionButton, status.buttonDanger && styles.dangerButton, !status.actionable && styles.disabledButton]}
-            disabled={!status.actionable}
-            onPress={() => navigation.navigate('CheckInManage', { eventId: item.event.id })}
-          >
-            <Text style={[styles.primaryActionText, status.buttonDanger && styles.dangerButtonText]}>{status.buttonLabel}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.secondaryActionButton} onPress={() => navigation.navigate('CheckInStatus', { eventId: item.event.id })}>
-            <Text style={styles.secondaryActionText}>체크인 현황</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
   };
 
   if (loading) {
@@ -277,7 +244,7 @@ export default function CheckInHomePage({ navigation }: any) {
       <Text style={styles.subtitle}>체크인 운영 현황을 한눈에 확인하고 바로 처리합니다.</Text>
 
       <View style={styles.dashboardGrid}>
-        {sectionSummaries.map(({ section, events, ticketMissing, preview }) => (
+        {sectionSummaries.map(({ section, events, ticketMissing, actionable }) => (
           <View key={section} style={styles.dashboardCard}>
             <View style={styles.sectionHead}>
               <Text style={styles.sectionTitle}>{section}</Text>
@@ -285,20 +252,16 @@ export default function CheckInHomePage({ navigation }: any) {
             </View>
 
             {section === '오늘 일정' ? (
-              <Text style={styles.summaryMeta}>오늘 실제 운영해야 하는 이벤트를 먼저 보여줍니다.</Text>
+              <Text style={styles.summaryMeta}>
+                {events.length === 0
+                  ? '오늘 예정된 이벤트가 없습니다.'
+                  : `이벤트 ${events.length}건 · 체크인 진행 가능 ${actionable}건`}
+              </Text>
             ) : section === '향후 일정' ? (
               <Text style={styles.summaryMeta}>체크인 예정 이벤트 {events.length}건 · 티켓 미발행 {ticketMissing}건</Text>
             ) : (
               <Text style={styles.summaryMeta}>종료된 체크인 이벤트 {events.length}건</Text>
             )}
-
-            {section === '오늘 일정' ? (
-              preview.length > 0 ? (
-                <View style={styles.previewList}>{preview.map((item) => renderEventCard(item))}</View>
-              ) : (
-                <Text style={styles.emptyText}>오늘 예정된 이벤트가 없습니다.</Text>
-              )
-            ) : null}
 
             <TouchableOpacity style={styles.overviewButton} onPress={() => openSection(section)}>
               <Text style={styles.overviewButtonText}>전체 보기</Text>
@@ -327,22 +290,6 @@ const styles = StyleSheet.create({
   sectionTitle: { color: '#0F172A', fontSize: 14, fontWeight: '900' },
   sectionHint: { color: '#64748B', fontSize: 12, fontWeight: '800' },
   summaryMeta: { marginTop: 6, color: '#64748B', fontSize: 12, lineHeight: 18 },
-  previewList: { marginTop: 10, gap: 8 },
-  eventCard: { borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 8, padding: 16, backgroundColor: '#FFFFFF', gap: 8 },
-  cardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
-  eventTitle: { color: '#0F172A', fontWeight: '900', fontSize: 14, flex: 1 },
-  eventMeta: { marginTop: 4, color: '#64748B', fontSize: 12 },
-  eventActions: { marginTop: 4, gap: 8 },
-  badge: { overflow: 'hidden', borderRadius: 999, backgroundColor: '#E0F2FE', color: '#0369A1', paddingHorizontal: 9, paddingVertical: 5, minWidth: 74, textAlign: 'center', fontSize: 11, fontWeight: '900' },
-  primaryActionButton: { borderRadius: 8, paddingVertical: 13, alignItems: 'center', backgroundColor: '#2563EB' },
-  primaryActionText: { color: '#FFFFFF', fontWeight: '900', fontSize: 13 },
-  dangerButton: { backgroundColor: '#FEE2E2', borderWidth: 1, borderColor: '#FCA5A5' },
-  dangerButtonText: { color: '#B91C1C' },
-  secondaryActionButton: { borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, paddingVertical: 13, alignItems: 'center', backgroundColor: '#FFFFFF' },
-  secondaryActionText: { color: '#0F172A', fontWeight: '900', fontSize: 12 },
   overviewButton: { marginTop: 10, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, paddingVertical: 12, alignItems: 'center', backgroundColor: '#FFFFFF' },
   overviewButtonText: { color: '#0F172A', fontWeight: '900', fontSize: 13 },
-  emptyText: { color: '#94A3B8', paddingVertical: 12, textAlign: 'center' },
-  disabledButton: { opacity: 0.55 },
-  linkText: { color: '#2563EB', fontWeight: '900', fontSize: 12 },
 });

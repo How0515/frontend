@@ -409,11 +409,16 @@ export default function CheckInManagePage({ navigation, route }: any) {
             {validators.length === 0 ? (
               <Text style={styles.emptyText}>등록된 검증자가 없습니다.</Text>
             ) : (
-              validators.map((validator, index) => (
-                <Text key={String(validator.id ?? index)} style={styles.validatorText}>
-                  {String(validator.displayName ?? validator.validatorId ?? validator.userId ?? validator.id ?? '-')}
-                </Text>
-              ))
+              validators.map((validator, index) => {
+                const name = String(validator.validatorDisplayName ?? validator.displayName ?? '-');
+                const email = String(validator.validatorEmail ?? validator.email ?? '');
+                return (
+                  <View key={String(validator.id ?? index)} style={styles.validatorRow}>
+                    <Text style={styles.validatorName}>{name}</Text>
+                    {email ? <Text style={styles.validatorEmail}>{email}</Text> : null}
+                  </View>
+                );
+              })
             )}
           </>
         ) : null}
@@ -481,5 +486,7 @@ const styles = StyleSheet.create({
   searchResultAction: { color: '#2563EB', fontWeight: '900', fontSize: 13 },
   sectionLabel: { marginTop: 16, marginBottom: 6, color: '#64748B', fontSize: 12, fontWeight: '800' },
   emptyText: { color: '#94A3B8', paddingTop: 14, textAlign: 'center' },
-  validatorText: { marginTop: 10, color: '#475569', fontWeight: '800' },
+  validatorRow: { paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
+  validatorName: { color: '#0F172A', fontWeight: '900', fontSize: 14 },
+  validatorEmail: { marginTop: 2, color: '#64748B', fontSize: 12, fontWeight: '700' },
 });
