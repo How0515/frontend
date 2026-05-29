@@ -203,6 +203,10 @@ export default function AuthPage({ navigation, route }: any) {
   // Set to true when pendingWalletLogin is restored from AsyncStorage so the
   // auto-login useEffect can report LoginTriggerSource as 'startup-restore'.
   const pendingRestoredFromStorageRef = useRef(false);
+  // Bumped (with a 600ms delay) each time the app foregrounds so the
+  // auto-login useEffect re-evaluates even when all deps were already settled
+  // while Trust Ticket was in the background.
+  const [appForegroundedAt, setAppForegroundedAt] = useState(0);
 
   const { open, disconnect } = useAppKit();
   const { address: appKitAddress, isConnected } = useAccount();
@@ -223,29 +227,52 @@ export default function AuthPage({ navigation, route }: any) {
     AsyncStorage.getItem(PENDING_WALLET_LOGIN_KEY)
       .then((raw) => {
         if (cancelled || !raw) return;
+        let parsed: unknown;
         try {
-          const record: PendingLoginRecord = JSON.parse(raw);
-          const age = Date.now() - record.timestamp;
-          if (record.pending && age < PENDING_LOGIN_TTL_MS) {
-            console.log('[WalletLogin] Restored recent pendingWalletLogin (age:', Math.round(age / 1000), 's)');
-            pendingRestoredFromStorageRef.current = true;
-            setPendingWalletLogin(true);
-            setWalletMode(true);
-          } else {
-            // Stale flag: clear storage and reset any lingering signing state
-            // so the UI does not show a frozen "signing" status from a previous session.
-            console.log('[WalletLogin] Stale pendingWalletLogin (age:', Math.round(age / 1000), 's) — clearing');
-            AsyncStorage.removeItem(PENDING_WALLET_LOGIN_KEY).catch(() => {});
-            setWalletStep('idle');
-            setWalletMessage('');
-            setLoading(false);
-            setFeedback({
-              type: 'error',
-              message: '이전 로그인 세션이 만료되었습니다. 다시 지갑으로 로그인해 주세요.',
-            });
-          }
+          parsed = JSON.parse(raw);
         } catch {
+          // Unparseable — clear silently.
+          console.log('[WalletLogin] Unparseable pendingWalletLogin — clearing');
           AsyncStorage.removeItem(PENDING_WALLET_LOGIN_KEY).catch(() => {});
+          return;
+        }
+
+        // Validate the expected { pending: true, timestamp: number } shape.
+        // Older code stored a plain boolean `true`, which produces a parsed
+        // value with no timestamp, causing `Date.now() - undefined = NaN`.
+        // Invalid / legacy values are cleared silently without resetting UI
+        // state or showing a misleading "session expired" message.
+        if (
+          typeof parsed !== 'object' ||
+          parsed === null ||
+          (parsed as any).pending !== true ||
+          typeof (parsed as any).timestamp !== 'number' ||
+          !isFinite((parsed as any).timestamp)
+        ) {
+          console.log('[WalletLogin] Invalid or legacy pendingWalletLogin format — clearing silently');
+          AsyncStorage.removeItem(PENDING_WALLET_LOGIN_KEY).catch(() => {});
+          return;
+        }
+
+        const record = parsed as PendingLoginRecord;
+        const age = Date.now() - record.timestamp;
+        if (age < PENDING_LOGIN_TTL_MS) {
+          console.log('[WalletLogin] Restored recent pendingWalletLogin (age:', Math.round(age / 1000), 's)');
+          pendingRestoredFromStorageRef.current = true;
+          setPendingWalletLogin(true);
+          setWalletMode(true);
+        } else {
+          // Stale flag: clear storage and reset any lingering signing state
+          // so the UI does not show a frozen "signing" status from a previous session.
+          console.log('[WalletLogin] Stale pendingWalletLogin (age:', Math.round(age / 1000), 's) — clearing');
+          AsyncStorage.removeItem(PENDING_WALLET_LOGIN_KEY).catch(() => {});
+          setWalletStep('idle');
+          setWalletMessage('');
+          setLoading(false);
+          setFeedback({
+            type: 'error',
+            message: '이전 로그인 세션이 만료되었습니다. 다시 지갑으로 로그인해 주세요.',
+          });
         }
       })
       .catch((err) => console.warn('[WalletLogin] Failed to read pending login flag:', err));
@@ -253,17 +280,27 @@ export default function AuthPage({ navigation, route }: any) {
     return () => { cancelled = true; };
   }, []);
 
-  // Log foreground transitions for debugging — helps pinpoint exactly which
-  // state the component is in when the app comes back from MetaMask.
+  // On foreground return: log full state and schedule appForegroundedAt bumps
+  // at 0 ms, 500 ms, and 1000 ms. The three attempts account for AppKit taking
+  // up to ~1 s to reflect the new WalletConnect session state (isConnected,
+  // provider, providerType) after the app comes to the foreground. Each bump
+  // causes the auto-login useEffect to re-evaluate its conditions.
   useEffect(() => {
     if (Platform.OS === 'web') return;
     const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'active') {
-        console.log(
-          '[WalletLogin] Foregrounded | pending:', pendingWalletLogin,
-          '| connected:', isConnected, '| loading:', loading,
-          '| step:', walletStep, '| autoRunning:', autoWalletLoginRef.current,
-        );
+      if (state !== 'active') return;
+      console.log('[WalletLogin] App foregrounded — checking wallet return', {
+        pendingWalletLogin,
+        isConnected,
+        address: appKitAddress,
+        walletStep,
+        loading,
+        autoLoginRunning: autoWalletLoginRef.current,
+      });
+      if (pendingWalletLogin && !autoWalletLoginRef.current && !loading) {
+        setAppForegroundedAt(Date.now());
+        setTimeout(() => setAppForegroundedAt(Date.now()), 500);
+        setTimeout(() => setAppForegroundedAt(Date.now()), 1000);
       }
     });
     return () => sub.remove();
@@ -510,27 +547,72 @@ export default function AuthPage({ navigation, route }: any) {
     setFeedback({ type: 'success', message: '지갑을 재연결합니다. MetaMask에서 연결을 승인해 주세요.' });
   };
 
-  // Auto-login: fires when the WalletConnect session becomes ready after the
-  // user approved the connection in MetaMask. Passes the appropriate source so
-  // connectReownWallet does NOT disconnect the just-established session.
+  // State-change trigger: fires whenever pendingWalletLogin, isConnected,
+  // appKitAddress, or provider changes. Logs on every change so the exact
+  // moment the session arrives is visible even when conditions aren't all met.
+  // This is the primary "wallet just connected" detector.
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+    console.log('[WalletLogin] WC state changed', {
+      pendingWalletLogin,
+      isConnected,
+      address: appKitAddress,
+      walletStep,
+      loading,
+      autoLoginRunning: autoWalletLoginRef.current,
+    });
+    if (
+      !pendingWalletLogin ||
+      !isConnected ||
+      !appKitAddress ||
+      !provider ||
+      autoWalletLoginRef.current ||
+      loading ||
+      walletStep === 'signing'
+    ) return;
+
+    console.log('[WalletLogin] State-change trigger — calling handleWalletLogin(wallet-return)');
+    autoWalletLoginRef.current = true;
+    setFeedback({ type: 'success', message: '지갑 연결이 완료되었습니다. 서명 요청을 이어갑니다.' });
+    void handleWalletLogin('wallet-return').finally(() => {
+      autoWalletLoginRef.current = false;
+    });
+  }, [pendingWalletLogin, isConnected, appKitAddress, provider]);
+
+  // AppForegroundedAt trigger: fires on each of the three delayed bumps from
+  // the AppState listener (0 ms, 500 ms, 1 000 ms). Covers the case where all
+  // WC state changes settled while the app was backgrounded — no dep change
+  // after foreground means the state-change effect above won't re-fire.
+  // Logs early-return reasons so we can see exactly which condition is missing.
   useEffect(() => {
     if (Platform.OS === 'web') return;
     if (!pendingWalletLogin || autoWalletLoginRef.current || loading) return;
-    if (!isConnected || !appKitAddress || !provider || providerType !== 'eip155') return;
+    if (!isConnected || !appKitAddress || !provider || providerType !== 'eip155') {
+      console.log('[WalletLogin] AppForeground retry — conditions not yet met', {
+        pendingWalletLogin,
+        isConnected,
+        hasAddress: Boolean(appKitAddress),
+        hasProvider: Boolean(provider),
+        providerType,
+        loading,
+        autoLoginRunning: autoWalletLoginRef.current,
+      });
+      return;
+    }
 
     const source: LoginTriggerSource = pendingRestoredFromStorageRef.current
       ? 'startup-restore'
       : 'wallet-return';
     pendingRestoredFromStorageRef.current = false;
 
-    console.log('[WalletLogin] Auto-login trigger | source:', source);
+    console.log('[WalletLogin] AppForeground trigger | source:', source);
     autoWalletLoginRef.current = true;
     setFeedback({ type: 'success', message: '지갑 연결이 완료되었습니다. 서명 요청을 이어갑니다.' });
 
     void handleWalletLogin(source).finally(() => {
       autoWalletLoginRef.current = false;
     });
-  }, [appKitAddress, isConnected, loading, pendingWalletLogin, provider, providerType]);
+  }, [appForegroundedAt, appKitAddress, isConnected, loading, pendingWalletLogin, provider, providerType]);
 
   // Route-param auto-start (navigated here with autoWalletLogin:true).
   useEffect(() => {
