@@ -120,13 +120,13 @@ function checkInStatus(item: CheckInEvent, now = new Date()): CheckInState {
         label: '체크인 예정',
         rank: 1,
         section: '오늘 일정',
-        actionable: false,
+        actionable: true,
         ticketCount,
         usedCount,
         startTime,
         startSummary,
-        buttonLabel: '체크인 예정',
-        buttonDanger: true,
+        buttonLabel: '체크인 하기',
+        buttonDanger: false,
       };
     }
 

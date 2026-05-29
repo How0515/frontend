@@ -246,20 +246,19 @@ export default function CheckInEventListPage({ navigation, route }: any) {
         renderItem={({ item }) => {
           const { item: event, status } = item;
           return (
-            <TouchableOpacity style={styles.card} onPress={() => navigation.navigate('OrganizerEventDetail', { eventId: event.event.id })}>
+            <TouchableOpacity style={styles.card} onPress={() => navigation.navigate('CheckInManage', { eventId: event.event.id })}>
               <View style={styles.cardHead}>
-                <Text style={styles.category}>{status.label}</Text>
-                <Text style={styles.salesBadge}>{status.label}</Text>
+                <Text style={styles.eventTitle}>{eventTitle(event.event)}</Text>
+                <Text style={[styles.salesBadge, !status.actionable && styles.salesBadgeMuted]}>{status.label}</Text>
               </View>
-              <Text style={styles.eventTitle}>{eventTitle(event.event)}</Text>
               <Text style={styles.eventMeta}>{status.startSummary}</Text>
               <Text style={styles.eventMeta}>입장 완료 {status.usedCount} / {status.ticketCount}</Text>
               <View style={styles.actionRow}>
                 <TouchableOpacity
-                  style={[styles.primaryButton]}
+                  style={[styles.primaryButton, !status.actionable && styles.primaryButtonMuted]}
                   onPress={() => navigation.navigate('CheckInManage', { eventId: event.event.id })}
                 >
-                  <Text style={styles.primaryButtonText}>체크인 하기</Text>
+                  <Text style={[styles.primaryButtonText, !status.actionable && styles.primaryButtonTextMuted]}>{status.actionable ? '체크인 하기' : status.buttonLabel}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.secondaryButton} onPress={() => navigation.navigate('CheckInStatus', { eventId: event.event.id })}>
                   <Text style={styles.secondaryButtonText}>체크인 현황</Text>
@@ -301,14 +300,16 @@ const styles = StyleSheet.create({
   backButtonText: { color: '#0F172A', fontWeight: '900' },
   list: { padding: 18, paddingTop: 8, paddingBottom: 96 },
   card: { backgroundColor: '#FFFFFF', borderRadius: 8, padding: 16, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 12 },
-  cardHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  category: { color: '#2563EB', fontSize: 12, fontWeight: '900' },
+  cardHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginBottom: 8 },
   salesBadge: { overflow: 'hidden', borderRadius: 999, backgroundColor: '#E0F2FE', color: '#0369A1', paddingHorizontal: 9, paddingVertical: 5, minWidth: 78, textAlign: 'center', fontSize: 11, fontWeight: '900' },
-  eventTitle: { fontSize: 17, fontWeight: '900', color: '#0F172A', marginBottom: 8 },
+  salesBadgeMuted: { backgroundColor: '#F1F5F9', color: '#64748B' },
+  eventTitle: { flex: 1, fontSize: 16, fontWeight: '900', color: '#0F172A' },
   eventMeta: { marginTop: 4, color: '#64748B', fontSize: 12, lineHeight: 18 },
   actionRow: { flexDirection: 'row', gap: 8, marginTop: 12 },
   primaryButton: { flex: 1, backgroundColor: '#2563EB', borderRadius: 8, paddingVertical: 13, alignItems: 'center' },
+  primaryButtonMuted: { backgroundColor: '#F1F5F9', borderWidth: 1, borderColor: '#CBD5E1' },
   primaryButtonText: { color: '#FFFFFF', fontWeight: '900' },
+  primaryButtonTextMuted: { color: '#64748B' },
   secondaryButton: { flex: 1, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, paddingVertical: 13, alignItems: 'center', backgroundColor: '#FFFFFF' },
   secondaryButtonText: { color: '#0F172A', fontWeight: '900' },
   empty: { alignItems: 'center', paddingVertical: 80 },
