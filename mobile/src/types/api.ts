@@ -42,6 +42,7 @@ export type AuthTokens = {
   accessToken: string;
   refreshToken?: string;
   user?: UserProfile;
+  isNewUser?: boolean;
 };
 
 export type WalletNonce = {

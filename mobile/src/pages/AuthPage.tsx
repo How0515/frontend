@@ -259,7 +259,16 @@ export default function AuthPage({ navigation, route }: any) {
       setWalletStep('signed');
       const result = await backendApi.loginWallet({ walletAddress: nonce.walletAddress, nonce: nonce.nonce, signature });
 
-      // 5. 프로필 조회 (회원가입이면 displayName 먼저 업데이트)
+      // 5. 회원가입 모드에서 이미 가입된 지갑이면 차단
+      if (!isLogin && !result.isNewUser) {
+        const message = '이미 가입된 지갑 주소입니다. 로그인 탭을 이용해주세요.';
+        setFeedback({ type: 'error', message });
+        Alert.alert('회원가입 불가', message);
+        setPendingWalletLogin(false);
+        return;
+      }
+
+      // 6. 프로필 조회 (회원가입이면 displayName 먼저 업데이트)
       const profile = !isLogin && displayName.trim()
         ? await backendApi.updateMe({ displayName: displayName.trim() })
         : result.user ?? await backendApi.getMe();
