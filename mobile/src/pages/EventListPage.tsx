@@ -1,5 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, Image } from 'react-native';
+﻿import React, { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, FlatList, ScrollView, StyleSheet, Text, TouchableOpacity, View, Image } from 'react-native';
+import { TextInput } from '../components/TextInput';
 import { backendApi } from '../lib/backend';
 import { resolveImageUrl } from '../lib/config';
 import { formatEventCategory, formatEventDate, getEventDisplayStatus, getNextRoundTime, operationSortRank, getUserEventDisplayStatus, formatNextRoundLabel, weiToEth, userSortRank } from '../lib/ticketDisplay';

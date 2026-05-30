@@ -1,5 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+﻿import React, { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { TextInput } from '../components/TextInput';
 import { backendApi } from '../lib/backend';
 import { formatEventCategory, formatEventDate } from '../lib/ticketDisplay';
 import type { EventDetail, ResaleListing, UserProfile } from '../types/api';

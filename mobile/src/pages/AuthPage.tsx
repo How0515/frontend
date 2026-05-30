@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+﻿import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAccount, useAppKit, useProvider } from '@reown/appkit-react-native';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -10,10 +10,10 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { TextInput } from '../components/TextInput';
 import { accountStatusMessage, errorMessage, routeForEntry } from '../lib/account';
 import { isWalletConnectConfigured } from '../lib/appkit';
 import { clearWalletSessionStorage } from '../lib/appkitStorage';

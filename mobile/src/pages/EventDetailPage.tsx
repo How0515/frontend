@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -7,10 +7,10 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { TextInput } from '../components/TextInput';
 import { backendApi } from '../lib/backend';
 import { resolveImageUrl } from '../lib/config';
 import { formatCompactDateTime, formatEventCategory, formatEventStatus, weiToEth } from '../lib/ticketDisplay';

@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+﻿import React, { useState } from 'react';
+import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { TextInput } from '../components/TextInput';
 import { accountStatusMessage, errorMessage, routeForEntry } from '../lib/account';
 import { backendApi } from '../lib/backend';
 
