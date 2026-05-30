@@ -113,7 +113,7 @@ export const appKit = createAppKit({
       native: `${config.appScheme}://`,
     },
   },
-  // universalProviderConfigOverride: wcNamespaceOverride,  // DIAG: disabled for A/B comparison
+  universalProviderConfigOverride: wcNamespaceOverride,
 });
 
 console.log('[ReownConfig]', {

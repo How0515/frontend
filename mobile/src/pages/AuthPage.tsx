@@ -164,7 +164,23 @@ async function ensureWalletNetwork(provider: EthereumProvider): Promise<void> {
           method: 'wallet_addEthereumChain',
           params: [{ chainId: chainIdHex, chainName: addMeta.chainName, nativeCurrency: addMeta.nativeCurrency, rpcUrls: [config.chainRpcUrl], blockExplorerUrls: addMeta.blockExplorerUrls }],
         });
-      } catch {
+      } catch (addError: any) {
+        const addMsg = typeof addError?.message === 'string' ? addError.message : '';
+        const isWcScopeError =
+          addError?.code === 5100 ||
+          addMsg.includes('not approved') ||
+          addMsg.includes('not supported') ||
+          addMsg.includes('does not support');
+
+        if (isWcScopeError) {
+          // WalletConnect 세션 수립 시 이 체인이 namespace에 포함되지 않은 경우.
+          // wallet_addEthereumChain도 세션 scope 밖이라 거절됨.
+          // 재연결하면 wcNamespaceOverride가 Sepolia를 session proposal에 명시해 해결됨.
+          throw new Error(
+            `${addMeta.chainName} 체인이 현재 WalletConnect 세션에 포함되어 있지 않습니다.\n` +
+            '"재연결" 버튼을 눌러 지갑을 다시 연결해 주세요.',
+          );
+        }
         throw new Error(`${addMeta.chainName} 네트워크 추가가 필요합니다. MetaMask에서 네트워크 추가 요청을 승인해주세요.`);
       }
     } else {
